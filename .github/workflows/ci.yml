@@ -127,6 +127,93 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
         run: npm run build
 
+  data-platform:
+    name: Data platform — tests & dbt
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: citypulse
+          POSTGRES_USER: citypulse
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U citypulse -d citypulse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: data-engineering/requirements*.txt
+
+      - name: Install dependencies
+        working-directory: data-engineering
+        # requirements.txt plus pytest, deliberately not requirements-dev.txt:
+        # that pulls PySpark, a 400 MB download whose only CI value would be
+        # re-running logic the pure-Python suite already covers. The Spark job
+        # imports the same modules from common/, so a break there fails here.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest==8.3.4
+
+      - name: Unit tests
+        working-directory: data-engineering
+        # 187 tests over validation, transforms, the generator's physics, the
+        # forecast features and anomaly detection. Without this job a third of
+        # the project's tests would not gate a merge.
+        run: python -m pytest -q
+
+      - name: Apply migrations
+        # dbt models read tables Flyway owns, so the schema has to exist first.
+        # Applied with the Flyway CLI rather than by booting the backend, which
+        # would pull the whole JVM in for a job that does not need it.
+        run: |
+          docker run --rm --network host \
+            -v "$PWD/backend/src/main/resources/db/migration:/flyway/sql" \
+            flyway/flyway:11-alpine \
+            -url=jdbc:postgresql://localhost:5432/citypulse \
+            -user=citypulse -password=ci-postgres-password \
+            -connectRetries=10 migrate
+
+      - name: Seed a slice of telemetry
+        working-directory: data-engineering
+        # dbt tests assert on real rows, so there has to be something to assert
+        # on. Two days is enough to exercise every model without making the job
+        # slow. Seeded, so a dbt failure here is reproducible.
+        env:
+          CITYPULSE_DB_URL: postgresql://localhost:5432/citypulse
+          CITYPULSE_DB_USER: citypulse
+          CITYPULSE_DB_PASSWORD: ci-postgres-password
+        run: |
+          python -m generator.main --sink jsonl --out /tmp/ci-events.jsonl --no-realtime \
+            --seed 7 --tick-seconds 300 \
+            --simulate-from "$(date -u -d '2 days ago' +%Y-%m-%dT00:00:00Z)" \
+            --simulate-to "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --quiet
+          python -m pipeline.local_runner --input /tmp/ci-events.jsonl \
+            --max-lateness-hours 72 --quiet
+
+      - name: dbt build
+        working-directory: data-engineering/dbt
+        # `build` rather than `run` then `test`: build interleaves them, so a
+        # model producing bad data never reaches the marts — the run fails first.
+        env:
+          # dbt's profile defaults host, port and database to exactly what the
+          # service container provides; only the password has no default.
+          DBT_PROFILES_DIR: .
+          CITYPULSE_DB_PASSWORD: ci-postgres-password
+        run: dbt build
+
   security:
     name: Security checks
     runs-on: ubuntu-latest
@@ -181,7 +268,7 @@ jobs:
     name: Docker images build
     runs-on: ubuntu-latest
     # An image is never built from code that failed its tests.
-    needs: [backend, frontend]
+    needs: [backend, frontend, data-platform]
 
     steps:
       - uses: actions/checkout@v4
@@ -256,3 +343,116 @@ jobs:
         run: |
           docker rm -f ci-backend ci-postgres 2>/dev/null || true
           docker network rm citypulse-ci 2>/dev/null || true
+
+  stack:
+    name: Full stack — compose up & verify
+    runs-on: ubuntu-latest
+    needs: [docker]
+
+    # This job exists because of a gap recorded in Phase 3: every service was
+    # verified individually on the development machine, but bringing all of them
+    # up together needed more disk than that machine had. A CI runner has room,
+    # so the claim gets tested here rather than left as "it should work".
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        # The full image set is roughly 5 GB. A hosted runner ships with several
+        # gigabytes of toolchains this job never touches, and reclaiming them is
+        # cheaper than discovering the limit mid-build.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h / | tail -1
+
+      - name: Write a throwaway .env
+        # Compose fails fast on missing secrets rather than booting on vendor
+        # defaults, so these must exist. All are ephemeral and never leave the
+        # runner.
+        run: |
+          cat > .env <<'ENVFILE'
+          POSTGRES_DB=citypulse
+          POSTGRES_USER=citypulse
+          POSTGRES_PASSWORD=ci-postgres-password
+          POSTGRES_HOST_PORT=5432
+          CITYPULSE_DB_URL=jdbc:postgresql://postgres:5432/citypulse
+          CITYPULSE_DB_USER=citypulse
+          CITYPULSE_DB_PASSWORD=ci-postgres-password
+          CITYPULSE_JWT_SECRET=ci-only-jwt-secret-at-least-32-bytes-long-0123456789
+          CITYPULSE_FRONTEND_URL=http://localhost:3000
+          CITYPULSE_CORS_ORIGINS=http://localhost:3000
+          CITYPULSE_DEMO_MODE=true
+          NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+          MINIO_ROOT_USER=citypulse
+          MINIO_ROOT_PASSWORD=ci-minio-password
+          AIRFLOW_FERNET_KEY=Zt5Zm9Xk3Qw7Rr1Yv8Nb2Hc4Jd6Kf0Lg8Mh2Pi4Qj6=
+          AIRFLOW_SECRET_KEY=ci-only-airflow-secret-key-value
+          AIRFLOW_ADMIN_USER=admin
+          AIRFLOW_ADMIN_PASSWORD=ci-only-admin-password
+          ENVFILE
+
+      - name: Validate the compose definition
+        run: docker compose --profile streaming config --quiet
+
+      - name: Bring the streaming stack up
+        run: docker compose --profile streaming up -d --build
+
+      - name: Wait for every service to report healthy
+        # Health, not "started". A container that is running but failing its
+        # health check has not proven anything.
+        run: |
+          for service in citypulse-postgres citypulse-kafka citypulse-minio citypulse-backend; do
+            echo "Waiting for $service..."
+            for _ in $(seq 1 90); do
+              status=$(docker inspect -f '{{.State.Health.Status}}' "$service" 2>/dev/null || echo missing)
+              if [ "$status" = "healthy" ]; then echo "  $service healthy"; break; fi
+              if [ "$status" = "missing" ]; then sleep 2; continue; fi
+              sleep 2
+            done
+            if [ "$(docker inspect -f '{{.State.Health.Status}}' "$service" 2>/dev/null)" != "healthy" ]; then
+              echo "$service never became healthy:"
+              docker logs --tail 60 "$service"
+              exit 1
+            fi
+          done
+          docker compose --profile streaming ps
+
+      - name: Verify Kafka topics were created
+        run: |
+          topics=$(docker exec citypulse-kafka \
+            /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list)
+          echo "$topics"
+          for expected in citypulse.traffic.v1 citypulse.dlq.v1; do
+            echo "$topics" | grep -q "$expected" || { echo "missing topic $expected"; exit 1; }
+          done
+
+      - name: Verify events reach the curated layer
+        # The end-to-end claim: the generator publishes, Spark consumes, and
+        # curated windows appear. Anything short of this is a stack that starts
+        # rather than a pipeline that works.
+        run: |
+          for _ in $(seq 1 60); do
+            count=$(docker exec citypulse-postgres psql -U citypulse -d citypulse -tAc \
+              "SELECT count(*) FROM zone_metrics" 2>/dev/null || echo 0)
+            echo "curated windows: $count"
+            if [ "${count:-0}" -gt 0 ]; then
+              echo "Events flowed generator -> Kafka -> Spark -> curated."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "No curated windows appeared. Logs:"
+          docker logs --tail 80 citypulse-spark
+          docker logs --tail 40 citypulse-generator
+          exit 1
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          docker compose --profile streaming ps
+          for c in citypulse-kafka citypulse-spark citypulse-generator citypulse-backend; do
+            echo "=== $c ==="; docker logs --tail 60 "$c" 2>&1 || true
+          done
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile streaming down -v
