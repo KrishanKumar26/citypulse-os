@@ -383,29 +383,44 @@ jobs:
 
       - name: Write a throwaway .env
         # Compose fails fast on missing secrets rather than booting on vendor
-        # defaults, so these must exist. All are ephemeral and never leave the
-        # runner.
+        # defaults, so these must exist. Every value is generated here rather
+        # than written into the file: a key-shaped literal in a committed
+        # workflow is indistinguishable from a real one to a scanner, to a
+        # reader, and to anyone who copies the pattern. gitleaks flagged exactly
+        # that, correctly.
         run: |
-          cat > .env <<'ENVFILE'
-          POSTGRES_DB=citypulse
-          POSTGRES_USER=citypulse
-          POSTGRES_PASSWORD=ci-postgres-password
-          POSTGRES_HOST_PORT=5432
-          CITYPULSE_DB_URL=jdbc:postgresql://postgres:5432/citypulse
-          CITYPULSE_DB_USER=citypulse
-          CITYPULSE_DB_PASSWORD=ci-postgres-password
-          CITYPULSE_JWT_SECRET=ci-only-jwt-secret-at-least-32-bytes-long-0123456789
-          CITYPULSE_FRONTEND_URL=http://localhost:3000
-          CITYPULSE_CORS_ORIGINS=http://localhost:3000
-          CITYPULSE_DEMO_MODE=true
-          NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-          MINIO_ROOT_USER=citypulse
-          MINIO_ROOT_PASSWORD=ci-minio-password
-          AIRFLOW_FERNET_KEY=Zt5Zm9Xk3Qw7Rr1Yv8Nb2Hc4Jd6Kf0Lg8Mh2Pi4Qj6=
-          AIRFLOW_SECRET_KEY=ci-only-airflow-secret-key-value
-          AIRFLOW_ADMIN_USER=admin
-          AIRFLOW_ADMIN_PASSWORD=ci-only-admin-password
-          ENVFILE
+          FERNET=$(python3 -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())")
+          JWT=$(openssl rand -base64 48 | tr -d '\n')
+          PGPASS=$(openssl rand -hex 16)
+          MINIOPASS=$(openssl rand -hex 16)
+          AIRFLOWPASS=$(openssl rand -hex 12)
+          AIRFLOWSECRET=$(openssl rand -base64 32 | tr -d '\n')
+
+          # Masked so a failing step cannot echo them into a public log.
+          for v in "$JWT" "$PGPASS" "$MINIOPASS" "$AIRFLOWPASS" "$AIRFLOWSECRET" "$FERNET"; do
+            echo "::add-mask::$v"
+          done
+
+          {
+            echo "POSTGRES_DB=citypulse"
+            echo "POSTGRES_USER=citypulse"
+            echo "POSTGRES_PASSWORD=$PGPASS"
+            echo "POSTGRES_HOST_PORT=5432"
+            echo "CITYPULSE_DB_URL=jdbc:postgresql://postgres:5432/citypulse"
+            echo "CITYPULSE_DB_USER=citypulse"
+            echo "CITYPULSE_DB_PASSWORD=$PGPASS"
+            echo "CITYPULSE_JWT_SECRET=$JWT"
+            echo "CITYPULSE_FRONTEND_URL=http://localhost:3000"
+            echo "CITYPULSE_CORS_ORIGINS=http://localhost:3000"
+            echo "CITYPULSE_DEMO_MODE=true"
+            echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8080"
+            echo "MINIO_ROOT_USER=citypulse"
+            echo "MINIO_ROOT_PASSWORD=$MINIOPASS"
+            echo "AIRFLOW_FERNET_KEY=$FERNET"
+            echo "AIRFLOW_SECRET_KEY=$AIRFLOWSECRET"
+            echo "AIRFLOW_ADMIN_USER=admin"
+            echo "AIRFLOW_ADMIN_PASSWORD=$AIRFLOWPASS"
+          } > .env
 
       - name: Validate the compose definition
         run: docker compose --profile streaming config --quiet
