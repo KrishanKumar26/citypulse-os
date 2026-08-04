@@ -17,7 +17,8 @@ Read this before anything else.
 | CI: build, test and scan on every push | **Verified** — six jobs, green |
 | CI container build and boot check | **Verified** — images build and the backend reports healthy |
 | All nine compose services together | **Attempted in CI** — see §5 |
-| Free-tier deployment (Neon + Render + Vercel) | **Written, not yet run** — see §9 |
+| Hosted database (Neon), migrated and seeded | **Verified** — schema v10, 165,800 windows, 200 MB |
+| Backend and frontend on Render + Vercel | **Written, not yet run** — needs account access |
 | AWS deployment | **Not built** — needs an account and a spend decision |
 
 Nothing here is a production deployment guide. What follows is accurate about
@@ -332,7 +333,41 @@ bash data-engineering/scripts/seed_hosted.sh
 
 Four weeks of history, then forecasts, accuracy scoring, baselines, anomalies,
 City Memory and the dbt marts — in that order, because each reads what the last
-one wrote. Roughly ten minutes.
+one wrote. Roughly forty minutes against Neon, most of it the day-by-day load.
+
+What this produced when it was actually run:
+
+| | |
+|---|---|
+| Curated windows | 165,800 over 28 days |
+| Forecasts | 10,400, of which 10,000 scored against actuals |
+| Models beating persistence | 20 of 20 |
+| Baselines | 13,440 zone/metric/hour-of-week buckets |
+| Anomalies | 215 |
+| Situations in City Memory | 13,780 |
+| Correlations | 30 pairs |
+| dbt models | 108, all passing |
+| Rejected records | 0 |
+| Database size | 200 MB of Neon's 500 MB |
+
+#### What went wrong doing it
+
+**Bulk writes died repeatedly on `SSL SYSCALL error: EOF detected`.** Not a row
+limit — a single send long enough to cross a network idle timeout gets cut, and
+because the write commits at the end, the whole thing rolls back. It cost a
+full seed twice before the cause was clear. Every bulk write now splits at
+1,000 rows (`common/db.py`), and the seed loads one day per iteration with a
+retry, so a dropped connection costs a day rather than everything.
+
+**The most recent day failed twice and was skipped.** Detection found zero
+anomalies as a direct result: it judges recent windows, and the recent windows
+were the ones missing. Zero anomalies on a seeded database is a symptom, not a
+clean bill of health — check `max(window_start)` in `zone_metrics` before
+believing it.
+
+**`dbt` was not on PATH.** The marts step failed at the very end of an
+otherwise successful forty-minute run. The script now resolves `dbt` from the
+interpreter's own directory.
 
 **5. Keep it current.** Add `HOSTED_PG_DSN` as a repository secret with the same
 connection string. The refresh workflow skips cleanly until it is set, so
