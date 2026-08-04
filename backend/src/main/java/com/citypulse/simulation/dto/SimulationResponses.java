@@ -78,7 +78,13 @@ public final class SimulationResponses {
             int zonesAffected,
 
             List<ZoneImpact> zones,
-            List<Recommendation> recommendations
+            List<Recommendation> recommendations,
+
+            @Schema(description = "True when the baseline this departed from was synthetic. "
+                                  + "A simulation built on generated telemetry produces generated "
+                                  + "conclusions, and PRD §42 requires that to be visible wherever "
+                                  + "it appears — not only on the readings it started from.")
+            boolean demoData
     ) {
     }
 
@@ -94,7 +100,8 @@ public final class SimulationResponses {
             BigDecimal delayChangeMin,
             BigDecimal baselineRisk,
             BigDecimal simulatedRisk,
-            int zonesAffected
+            int zonesAffected,
+            boolean demoData
     ) {
     }
 }

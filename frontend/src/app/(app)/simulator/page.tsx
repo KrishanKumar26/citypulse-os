@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   CardHeader,
+  DemoDataBadge,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -304,7 +305,19 @@ function ResultView({ result }: { result: SimulationDetail }) {
         <CardHeader
           title={result.name}
           description={`From the window at ${new Date(result.baselineWindow).toLocaleString()} · engine ${result.engineVersion}`}
-          action={<Badge level="info">SIMULATED</Badge>}
+          action={
+            <div className="flex items-center gap-1.5">
+              <Badge level="info">SIMULATED</Badge>
+              {/*
+                Two separate claims, so two separate labels. "Simulated" means
+                the engine computed it; "demo data" means the conditions it
+                started from were generated. A result can be one without the
+                other, and collapsing them would let synthetic input pass as
+                real once the modelling was understood.
+              */}
+              {result.demoData && <DemoDataBadge />}
+            </div>
+          }
         />
 
         <div className="grid gap-px bg-line-subtle sm:grid-cols-4">

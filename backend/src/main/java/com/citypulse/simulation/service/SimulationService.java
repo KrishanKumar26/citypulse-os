@@ -247,7 +247,8 @@ public class SimulationService {
                         s.getUid().toString(), s.getName(), s.getDescription(),
                         s.getCreatedAt(), s.getBaselineWindow(), s.getEngineVersion(),
                         s.getTrafficChangePct(), s.getDelayChangeMin(),
-                        s.getBaselineRisk(), s.getSimulatedRisk(), s.getZonesAffected()));
+                        s.getBaselineRisk(), s.getSimulatedRisk(), s.getZonesAffected(),
+                        s.getCity().isDemoData()));
     }
 
     private SimulationResponses.SimulationDetail toDetail(Simulation s) {
@@ -281,7 +282,8 @@ public class SimulationService {
                 s.getBaselineWindow(), s.getEngineVersion(), s.getComputedMs(),
                 s.getTrafficChangePct(), s.getCrowdChangePct(), s.getParkingChangePct(),
                 s.getDelayChangeMin(), s.getBaselineRisk(), s.getSimulatedRisk(),
-                s.getZonesAffected(), impacts, recommendations);
+                s.getZonesAffected(), impacts, recommendations,
+                s.getCity().isDemoData());
     }
 
     private BigDecimal average(List<ScenarioEngine.Outcome> outcomes,

@@ -484,6 +484,8 @@ export interface SimulationDetail {
   zonesAffected: number;
   zones: ZoneImpact[];
   recommendations: SimulationRecommendation[];
+  /** True when the baseline was synthetic — so the conclusions are too. */
+  demoData: boolean;
 }
 
 export interface SimulationSummary {
@@ -498,6 +500,7 @@ export interface SimulationSummary {
   baselineRisk: string | null;
   simulatedRisk: string | null;
   zonesAffected: number;
+  demoData: boolean;
 }
 
 // --- Intelligence (PRD §12, §13, §16) ---------------------------------------
