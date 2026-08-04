@@ -1,0 +1,168 @@
+version: 2
+
+models:
+  - name: stg_zones
+    description: Active zone reference.
+    columns:
+      - name: zone_id
+        tests: [not_null, unique]
+      - name: zone_code
+        tests: [not_null, unique]
+      - name: city_id
+        tests:
+          - not_null
+          # relationships (PRD §24): a zone pointing at a missing city would
+          # silently drop rows from every join downstream.
+          - relationships:
+              arguments:
+                to: ref('stg_cities')
+                field: city_id
+      - name: zone_type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [RESIDENTIAL, COMMERCIAL, INDUSTRIAL, MIXED,
+                         TRANSIT_HUB, EDUCATIONAL, RECREATIONAL, AIRPORT]
+      - name: road_capacity_vph
+        # Positivity is asserted by tests/assert_zone_capacity_positive.sql
+        # rather than a dbt_utils generic, so the project has no package to
+        # install before it can run.
+        tests: [not_null]
+
+  - name: stg_cities
+    columns:
+      - name: city_id
+        tests: [not_null, unique]
+      - name: city_slug
+        tests: [not_null, unique]
+      - name: timezone
+        tests: [not_null]
+
+  - name: stg_traffic_events
+    description: Validated traffic readings. One row per event.
+    columns:
+      - name: traffic_event_id
+        tests: [not_null, unique]
+      - name: event_id
+        description: Producer idempotency key; duplicates must never reach here.
+        tests: [not_null, unique]
+      - name: zone_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_zones')
+                field: zone_id
+      - name: event_time
+        tests: [not_null]
+      - name: congestion_level
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [NORMAL, MODERATE, HIGH, CRITICAL]
+      - name: occupancy_ratio
+        tests: [not_null]
+      - name: average_speed_kph
+        tests: [not_null]
+      - name: demo_data
+        description: PRD §42 — synthetic data stays labelled through every layer.
+        tests: [not_null]
+
+  - name: stg_weather_events
+    columns:
+      - name: weather_event_id
+        tests: [not_null, unique]
+      - name: event_id
+        tests: [not_null, unique]
+      - name: city_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_cities')
+                field: city_id
+      - name: weather_condition
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [CLEAR, CLOUDY, OVERCAST, LIGHT_RAIN, RAIN,
+                         HEAVY_RAIN, THUNDERSTORM, FOG, HAZE]
+      - name: humidity_pct
+        tests: [not_null]
+
+  - name: stg_air_quality_events
+    columns:
+      - name: air_quality_event_id
+        tests: [not_null, unique]
+      - name: event_id
+        tests: [not_null, unique]
+      - name: zone_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_zones')
+                field: zone_id
+      - name: aqi
+        tests: [not_null]
+      - name: aqi_category
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [GOOD, SATISFACTORY, MODERATE, POOR, VERY_POOR, SEVERE]
+
+  - name: stg_incidents
+    columns:
+      - name: incident_id
+        tests: [not_null, unique]
+      - name: incident_uid
+        tests: [not_null, unique]
+      - name: zone_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_zones')
+                field: zone_id
+      - name: incident_type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [ACCIDENT, BREAKDOWN, ROAD_CLOSURE, CONSTRUCTION, FLOODING,
+                         PROTEST, FIRE, SIGNAL_FAILURE, OTHER]
+      - name: severity
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [LOW, MEDIUM, HIGH, CRITICAL]
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [REPORTED, CONFIRMED, IN_PROGRESS, CLEARED, CANCELLED]
+
+  - name: stg_city_events
+    columns:
+      - name: city_event_id
+        tests: [not_null, unique]
+      - name: zone_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_zones')
+                field: zone_id
+      - name: event_category
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [SPORTS, CONCERT, FESTIVAL, CONFERENCE, PARADE,
+                         POLITICAL, RELIGIOUS, MARKET, OTHER]

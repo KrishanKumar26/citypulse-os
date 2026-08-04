@@ -1,0 +1,42 @@
+# Spark Structured Streaming runtime.
+#
+# The official Spark image already carries a matching JVM and Scala build, which
+# is what makes the Kafka connector version pin in docker-compose.yml valid.
+# Installing Spark on top of a plain Python image instead would mean owning that
+# compatibility matrix by hand.
+
+FROM apache/spark:4.0.0-python3
+
+USER root
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /opt/citypulse/data-engineering
+
+# Only what the job's own code needs. PySpark ships with the image, so
+# installing it again from requirements.txt would shadow the version the JVM
+# side expects — a mismatch that surfaces as an obscure serialisation error at
+# the first micro-batch rather than at install time.
+RUN pip install --no-cache-dir "psycopg[binary]==3.2.3" "kafka-python==2.0.2" "pyyaml>=6.0"
+
+COPY common/ ./common/
+COPY pipeline/ ./pipeline/
+COPY generator/ ./generator/
+
+# The S3A connector for MinIO. Pinned to the Hadoop version this Spark build
+# links against; a mismatched aws-java-sdk is the usual cause of
+# NoSuchMethodError at the first lake write.
+RUN mkdir -p /opt/spark/jars \
+    && cd /opt/spark/jars \
+    && curl -fsSLO https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar \
+    && curl -fsSLO https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.24.6/bundle-2.24.6.jar
+
+COPY docker/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
+
+RUN chown -R 185:185 /opt/citypulse
+# 185 is the spark user in the upstream image.
+USER 185
+
+ENV PYTHONPATH=/opt/citypulse/data-engineering

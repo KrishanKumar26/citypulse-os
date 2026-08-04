@@ -1,0 +1,80 @@
+# =============================================================================
+# Test configuration.
+#
+# Integration tests run against a real PostgreSQL database, not an in-memory
+# substitute: the schema uses partial unique indexes, check constraints, and
+# TIMESTAMPTZ semantics that H2 does not reproduce, so a test that passed on H2
+# would prove nothing about production behaviour.
+#
+# Create the database once:
+#   createdb citypulse_test
+#
+# CI provides the same database as a service container.
+# =============================================================================
+
+spring:
+  datasource:
+    url: ${CITYPULSE_TEST_DB_URL:jdbc:postgresql://localhost:5432/citypulse_test}
+    username: ${CITYPULSE_TEST_DB_USER:citypulse}
+    password: ${CITYPULSE_TEST_DB_PASSWORD:${CITYPULSE_DB_PASSWORD:}}
+    hikari:
+      maximum-pool-size: 5
+
+  flyway:
+    # Migrations are applied to citypulse_test the same way as to any other
+    # environment, so the tests exercise the real migration path.
+    #
+    # If a migration is edited after it has been applied, Flyway will refuse to
+    # start with a checksum mismatch. That is the correct behaviour — recreate
+    # the test database rather than weakening validation:
+    #   dropdb citypulse_test && createdb citypulse_test
+    validate-on-migrate: true
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+citypulse:
+  app:
+    name: CityPulse OS
+    frontend-url: http://localhost:3000
+    demo-mode: true
+
+  security:
+    jwt:
+      # Test-only fixed key so token assertions are deterministic. Not a secret,
+      # and never used outside the test profile.
+      secret: test-only-jwt-signing-key-not-used-in-any-real-environment-0123456789
+      issuer: citypulse-os
+      access-token-ttl: PT15M
+    refresh:
+      ttl: P7D
+      max-active-sessions-per-user: 5
+    lockout:
+      max-failed-attempts: 5
+      duration: PT15M
+    rate-limit:
+      # Off by default: the per-IP limit would otherwise reject legitimate test
+      # traffic. RateLimitIT enables it explicitly for its own assertions.
+      enabled: false
+      auth-requests-per-minute: 10
+    password-reset:
+      token-ttl: PT30M
+    signup:
+      require-email-verification: false
+      verification-token-ttl: PT24H
+    cors:
+      allowed-origins: http://localhost:3000
+      allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+      max-age: PT1H
+
+  bootstrap:
+    # No bootstrap administrator in tests; each test creates the accounts it needs.
+    admin-email: ""
+    admin-password: ""
+
+logging:
+  level:
+    root: WARN
+    com.citypulse: INFO
+    org.flywaydb: WARN

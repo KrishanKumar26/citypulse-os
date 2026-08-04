@@ -1,0 +1,93 @@
+# ---------------------------------------------------------------------------
+# Secrets — never commit. See docs/SECURITY.md
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+**/application-local.yml
+**/application-local.yaml
+**/application-secret*.yml
+credentials.json
+.aws/
+.terraform/
+*.tfvars
+!*.tfvars.example
+*.tfstate
+*.tfstate.*
+
+# ---------------------------------------------------------------------------
+# Java / Maven
+# ---------------------------------------------------------------------------
+target/
+!.mvn/wrapper/maven-wrapper.jar
+build/
+*.class
+*.jar
+*.war
+!**/.mvn/wrapper/*.jar
+hs_err_pid*
+replay_pid*
+
+# ---------------------------------------------------------------------------
+# Node / Next.js
+# ---------------------------------------------------------------------------
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+coverage/
+playwright-report/
+test-results/
+
+# ---------------------------------------------------------------------------
+# Python / data engineering
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+spark-warehouse/
+metastore_db/
+derby.log
+airflow.db
+airflow-webserver.pid
+logs/
+data-engineering/airflow/logs/
+dbt/target/
+dbt/dbt_packages/
+.user.yml
+
+# ---------------------------------------------------------------------------
+# Local data lake / volumes (raw data must never be committed)
+# ---------------------------------------------------------------------------
+.data/
+minio-data/
+pgdata/
+kafka-data/
+
+# ---------------------------------------------------------------------------
+# OS / IDE
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+!.vscode/extensions.json
+.settings/
+.classpath
+.project

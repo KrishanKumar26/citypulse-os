@@ -1,0 +1,41 @@
+# Airflow scheduler and webserver for the CityPulse DAGs.
+#
+# The DAGs shell out to the generator, the pipeline runner and dbt, so this
+# image carries the data-engineering package and its virtualenv at the same path
+# the DAGs reference through CITYPULSE_DE_HOME.
+
+FROM apache/airflow:2.10.4-python3.12
+
+USER root
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y build-essential libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# The project's dependencies go in their own virtualenv rather than into
+# Airflow's. dbt-core and Airflow pin overlapping libraries at different
+# versions, and resolving them into one environment produces a combination
+# neither project tests. The DAGs invoke this interpreter by absolute path.
+COPY --chown=airflow:root requirements.txt /opt/citypulse/data-engineering/requirements.txt
+RUN python -m venv /opt/citypulse/data-engineering/.venv \
+    && /opt/citypulse/data-engineering/.venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/citypulse/data-engineering/.venv/bin/pip install --no-cache-dir \
+       -r /opt/citypulse/data-engineering/requirements.txt
+
+COPY --chown=airflow:root common/ /opt/citypulse/data-engineering/common/
+COPY --chown=airflow:root generator/ /opt/citypulse/data-engineering/generator/
+COPY --chown=airflow:root pipeline/ /opt/citypulse/data-engineering/pipeline/
+COPY --chown=airflow:root kafka_admin/ /opt/citypulse/data-engineering/kafka_admin/
+COPY --chown=airflow:root dbt/ /opt/citypulse/data-engineering/dbt/
+
+# psycopg is imported directly by the quality-check tasks, which run in the
+# scheduler's interpreter rather than through the project venv.
+RUN pip install --no-cache-dir "psycopg[binary]==3.2.3"
+
+ENV CITYPULSE_DE_HOME=/opt/citypulse/data-engineering \
+    DBT_PROFILES_DIR=/opt/citypulse/data-engineering/dbt

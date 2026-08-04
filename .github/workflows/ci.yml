@@ -1,0 +1,258 @@
+# =============================================================================
+# CityPulse OS — CI
+#
+# Pipeline (PRD §34): lint → test → build → security checks → docker build.
+#
+# Deployment is deliberately absent: no cloud environment exists yet, and a
+# deploy job that does nothing would report green while proving nothing. It is
+# added in Phase 8, together with the AWS infrastructure it targets.
+#
+# Jobs run in parallel where they are independent, and the docker job gates on
+# both language jobs so an image is never built from code that failed its tests.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push supersedes an in-flight run on the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "21"
+  NODE_VERSION: "22"
+
+jobs:
+  backend:
+    name: Backend — build & test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Integration tests run against real PostgreSQL. The schema depends on
+        # partial unique indexes, check constraints and TIMESTAMPTZ semantics
+        # that an in-memory database does not reproduce, so a test passing
+        # against H2 would say nothing about production behaviour.
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: citypulse_test
+          POSTGRES_USER: citypulse
+          # CI-only, throwaway, and never used outside this ephemeral container.
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U citypulse -d citypulse_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Verify migrations match the JPA mappings
+        # ddl-auto=validate makes the application refuse to start when an entity
+        # and its table disagree, so a successful test run is also a schema check.
+        run: ./backend/mvnw -B -f backend/pom.xml compile
+
+      - name: Unit and integration tests
+        env:
+          CITYPULSE_TEST_DB_URL: jdbc:postgresql://localhost:5432/citypulse_test
+          CITYPULSE_TEST_DB_USER: citypulse
+          CITYPULSE_TEST_DB_PASSWORD: ci-postgres-password
+        run: ./backend/mvnw -B -f backend/pom.xml verify
+
+      - name: Publish test report
+        # Runs even on failure — a red build is exactly when the report matters.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: |
+            backend/target/surefire-reports/
+            backend/target/failsafe-reports/
+          retention-days: 7
+
+  frontend:
+    name: Frontend — lint, test & build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        # ci, not install: fails when package-lock.json is out of sync rather
+        # than silently resolving different versions than a developer has.
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Component and unit tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Production build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+        run: npm run build
+
+  security:
+    name: Security checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the secret scan can inspect every commit, not only
+          # the tip. A credential committed and then reverted is still leaked.
+          fetch-depth: 0
+
+      - name: Scan history for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        # Fails on high and critical only. Failing on every low-severity
+        # advisory trains people to ignore the job, which is worse than not
+        # running it. Lower-severity findings still appear in the log.
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Check for known-vulnerable Java dependencies
+        # Advisory: the NVD feed is rate-limited without an API key and produces
+        # false positives, so this reports without blocking the merge. It becomes
+        # blocking in Phase 8 once an NVD key is configured.
+        continue-on-error: true
+        run: >-
+          ./backend/mvnw -B -f backend/pom.xml
+          org.owasp:dependency-check-maven:check
+          -DfailBuildOnCVSS=8
+          -DskipProvidedScope=true
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    # An image is never built from code that failed its tests.
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: citypulse/backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: citypulse/frontend:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the backend image starts and reports healthy
+        # A build that produces an image which cannot boot is not a passing build.
+        run: |
+          docker network create citypulse-ci
+
+          docker run -d --name ci-postgres --network citypulse-ci \
+            -e POSTGRES_DB=citypulse \
+            -e POSTGRES_USER=citypulse \
+            -e POSTGRES_PASSWORD=ci-postgres-password \
+            postgres:17-alpine
+
+          echo "Waiting for PostgreSQL..."
+          for _ in $(seq 1 30); do
+            if docker exec ci-postgres pg_isready -U citypulse -d citypulse >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+
+          docker run -d --name ci-backend --network citypulse-ci \
+            -e CITYPULSE_DB_URL=jdbc:postgresql://ci-postgres:5432/citypulse \
+            -e CITYPULSE_DB_USER=citypulse \
+            -e CITYPULSE_DB_PASSWORD=ci-postgres-password \
+            -e CITYPULSE_JWT_SECRET=ci-only-jwt-secret-at-least-32-bytes-long-0123456789 \
+            -p 8080:8080 \
+            citypulse/backend:${{ github.sha }}
+
+          echo "Waiting for the backend to report healthy..."
+          for _ in $(seq 1 45); do
+            if curl -sf http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              echo "Backend is healthy."
+              # Also confirm migrations ran and seeded data is queryable.
+              curl -sf http://localhost:8080/api/v1/meta/platform | grep -q '"success":true'
+              echo "Platform metadata endpoint responded."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Backend did not become healthy. Logs:"
+          docker logs ci-backend
+          exit 1
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f ci-backend ci-postgres 2>/dev/null || true
+          docker network rm citypulse-ci 2>/dev/null || true

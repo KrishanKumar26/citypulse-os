@@ -1,0 +1,181 @@
+# =============================================================================
+# CityPulse OS — base configuration
+#
+# Secrets are supplied through the environment only. Values that must never have
+# a default (the JWT secret, the database password) are written without a
+# fallback, so a misconfigured deployment fails at startup instead of running
+# with a guessable value (docs/SECURITY.md §1).
+# =============================================================================
+
+spring:
+  application:
+    name: citypulse-backend
+
+  datasource:
+    url: ${CITYPULSE_DB_URL:jdbc:postgresql://localhost:5432/citypulse}
+    username: ${CITYPULSE_DB_USER:citypulse}
+    password: ${CITYPULSE_DB_PASSWORD}
+    hikari:
+      # Sized for a single container. Postgres handles concurrency far better
+      # with a small pool than a large one; raise only against measured
+      # saturation of the hikari metrics.
+      maximum-pool-size: ${CITYPULSE_DB_POOL_MAX:10}
+      minimum-idle: 2
+      connection-timeout: 10000
+      # Below the typical 30-minute idle timeout on managed Postgres, so the
+      # pool retires connections before the server does.
+      max-lifetime: 1200000
+
+  jpa:
+    open-in-view: false          # A request must not hold a DB connection while rendering.
+    hibernate:
+      ddl-auto: validate         # Flyway owns the schema; Hibernate only checks it matches.
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+          time_zone: UTC
+        order_inserts: true
+        order_updates: true
+        # Fails the build-time contract rather than silently issuing N+1 queries
+        # when a lazy association is touched outside a session.
+        query:
+          fail_on_pagination_over_collection_fetch: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    validate-on-migrate: true
+
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
+
+  threads:
+    virtual:
+      enabled: true              # Java 21 virtual threads; request handling is I/O bound.
+
+server:
+  port: ${CITYPULSE_SERVER_PORT:8080}
+  # Bounds request size so a large body cannot be used to exhaust memory.
+  max-http-request-header-size: 16KB
+  tomcat:
+    max-swallow-size: 1MB
+    max-http-form-post-size: 1MB
+  error:
+    # Errors are produced by GlobalExceptionHandler; nothing internal is exposed.
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+  shutdown: graceful
+
+citypulse:
+  app:
+    name: CityPulse OS
+    # Used to build verification and reset links. Configured, never derived from
+    # the Host header, which a caller controls.
+    frontend-url: ${CITYPULSE_FRONTEND_URL:http://localhost:3000}
+    demo-mode: ${CITYPULSE_DEMO_MODE:true}
+
+  telemetry:
+    # The pipeline writes five-minute windows. Three of them missing means
+    # ingestion has stopped rather than that the city went quiet, and the UI
+    # must be able to tell the difference instead of charting a flat line.
+    freshness-budget: PT15M
+    # Beyond this a window is not "current" at all: the zone reports no data
+    # rather than yesterday's conditions presented as today's.
+    max-age: PT2H
+    # Matched to the window size. Pushing faster would resend identical numbers;
+    # slower would leave the dashboard behind data the server already has.
+    stream-interval: PT5S
+    # Proxies close idle connections, and a client cannot distinguish that from
+    # a server with nothing to say. A comment frame keeps the socket honest.
+    heartbeat-interval: PT20S
+    # Caps a history request so one call cannot ask for a month of windows.
+    max-history-windows: 500
+
+  alerting:
+    # Slower than the stream: a condition that has held for five seconds has not
+    # changed, and re-evaluating every push cycle would burn queries to reach the
+    # same conclusion. Deduplication means a missed cycle costs nothing anyway.
+    interval: PT30S
+
+  security:
+    jwt:
+      # No default. Generate with: openssl rand -base64 48
+      secret: ${CITYPULSE_JWT_SECRET}
+      issuer: citypulse-os
+      access-token-ttl: PT15M
+    refresh:
+      ttl: P7D
+      max-active-sessions-per-user: 5
+    lockout:
+      max-failed-attempts: 5
+      duration: PT15M
+    rate-limit:
+      enabled: true
+      auth-requests-per-minute: 10
+    password-reset:
+      token-ttl: PT30M
+    signup:
+      # Off locally because no mail provider is configured; on in production.
+      require-email-verification: ${CITYPULSE_REQUIRE_EMAIL_VERIFICATION:false}
+      verification-token-ttl: PT24H
+    cors:
+      allowed-origins: ${CITYPULSE_CORS_ORIGINS:http://localhost:3000}
+      allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+      max-age: PT1H
+
+  bootstrap:
+    # Creates the first SUPER_ADMIN when both values are supplied and no such
+    # account exists. Left unset, nothing is created — there is deliberately no
+    # built-in default administrator (docs/SECURITY.md §1).
+    admin-email: ${CITYPULSE_BOOTSTRAP_ADMIN_EMAIL:}
+    admin-password: ${CITYPULSE_BOOTSTRAP_ADMIN_PASSWORD:}
+    admin-name: ${CITYPULSE_BOOTSTRAP_ADMIN_NAME:Platform Administrator}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      # Detail requires authentication; an anonymous probe gets UP/DOWN only.
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: citypulse-backend
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+logging:
+  level:
+    root: INFO
+    com.citypulse: ${CITYPULSE_LOG_LEVEL:INFO}
+    org.springframework.security: INFO
+  pattern:
+    # requestId comes from RequestIdFilter's MDC entry, correlating every line
+    # of one request and matching the id returned in error responses.
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{36} - %msg%n"

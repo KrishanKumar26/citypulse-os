@@ -1,0 +1,17 @@
+target
+.git
+.gitignore
+Dockerfile
+.dockerignore
+# Never copied into an image: environment variables supply configuration.
+.env
+.env.*
+**/application-local.yml
+**/application-local.yaml
+*.log
+.idea
+*.iml
+.settings
+.classpath
+.project
+README.md

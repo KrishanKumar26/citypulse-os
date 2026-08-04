@@ -1,0 +1,15 @@
+# Credentials come from the environment, never from this file (PRD §30).
+# Source the repository .env before running dbt.
+citypulse:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('CITYPULSE_PG_HOST', 'localhost') }}"
+      port: "{{ env_var('CITYPULSE_PG_PORT', '5432') | int }}"
+      user: "{{ env_var('CITYPULSE_DB_USER', 'citypulse') }}"
+      password: "{{ env_var('CITYPULSE_DB_PASSWORD') }}"
+      dbname: "{{ env_var('CITYPULSE_PG_DATABASE', 'citypulse') }}"
+      schema: analytics
+      threads: 4
+      keepalives_idle: 0

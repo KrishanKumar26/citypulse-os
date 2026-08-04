@@ -1,0 +1,210 @@
+package com.citypulse.support;
+
+import com.citypulse.auth.dto.AuthRequests;
+import com.citypulse.user.domain.Role;
+import com.citypulse.user.domain.User;
+import com.citypulse.user.domain.UserStatus;
+import com.citypulse.user.repository.RoleRepository;
+import com.citypulse.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.WebApplicationContext;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+
+/**
+ * Base class for integration tests. Boots the full application against a real
+ * PostgreSQL database and drives it through the HTTP layer, so filters, the
+ * security chain, validation, and the exception handler are all exercised —
+ * the parts a service-level test would skip.
+ *
+ * <p>Tests are not wrapped in a rollback transaction. Several security
+ * behaviours deliberately commit in {@code REQUIRES_NEW} transactions (lockout
+ * counters, token-family revocation, audit entries), and a surrounding rollback
+ * would hide exactly the behaviour under test. State is reset explicitly
+ * instead.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@ActiveProfiles("test")
+public abstract class IntegrationTest {
+
+    /** Satisfies the password policy; reused so tests read consistently. */
+    protected static final String VALID_PASSWORD = "Str0ng!Passw0rd#2026";
+
+    @Autowired
+    protected WebApplicationContext webApplicationContext;
+
+    @Autowired
+    protected ObjectMapper objectMapper;
+
+    @Autowired
+    protected UserRepository userRepository;
+
+    @Autowired
+    protected RoleRepository roleRepository;
+
+    @Autowired
+    protected PasswordEncoder passwordEncoder;
+
+    @Autowired
+    protected TransactionTemplate transactionTemplate;
+
+    @Autowired
+    protected EntityManager entityManager;
+
+    protected MockMvc mockMvc;
+
+    /**
+     * Registered explicitly below. {@code webAppContextSetup} wires up the
+     * security chain but not filters that Boot registers with the servlet
+     * container, so without this the request-id correlation that production
+     * traffic gets would be silently absent from every test.
+     */
+    @Autowired
+    protected com.citypulse.common.web.RequestIdFilter requestIdFilter;
+
+    @BeforeEach
+    void setUpIntegrationTest() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .addFilters(requestIdFilter)
+                .apply(springSecurity())
+                .build();
+        resetMutableState();
+    }
+
+    /**
+     * Slugs seeded by migration V3. Cities with any other slug were created by a
+     * test and must not survive into the next one.
+     */
+    private static final List<String> SEEDED_CITY_SLUGS = List.of("bengaluru", "noida", "mumbai");
+
+    /**
+     * Clears per-test data while leaving seeded reference data intact.
+     *
+     * <p>Roles and permissions come from migration V2 and the three demo cities
+     * from V3; nearly every test reads them, so truncating would mean re-seeding
+     * constantly. Everything a test can write is cleared.
+     *
+     * <p>Cities need the selective treatment rather than a truncate: a test that
+     * creates a city would otherwise leave it behind, and the next run would fail
+     * on a duplicate slug — a test failure caused purely by run order, which is
+     * exactly the kind of flake that erodes trust in a suite.
+     */
+    protected void resetMutableState() {
+        transactionTemplate.executeWithoutResult(status -> {
+            entityManager.createNativeQuery(
+                            "TRUNCATE TABLE audit_logs, refresh_tokens, user_tokens, user_roles, users "
+                            + "RESTART IDENTITY CASCADE")
+                    .executeUpdate();
+
+            // Curated telemetry and the alerts derived from it. Both are per-test
+            // data: a leftover severe window would raise alerts in an unrelated
+            // test, and a leftover alert would break another's counts — order-
+            // dependent failures that look like flakes rather than bugs.
+            entityManager.createNativeQuery(
+                            "TRUNCATE TABLE alerts, zone_metrics RESTART IDENTITY CASCADE")
+                    .executeUpdate();
+
+            // Forecasts and the model runs behind them. A leftover ACTIVE run
+            // would be picked up by the next test's queries and report someone
+            // else's measured error.
+            entityManager.createNativeQuery(
+                            "TRUNCATE TABLE forecast_accuracy, forecasts, model_metrics, model_runs "
+                            + "RESTART IDENTITY CASCADE")
+                    .executeUpdate();
+
+            entityManager.createNativeQuery(
+                            "TRUNCATE TABLE simulation_results, simulations RESTART IDENTITY CASCADE")
+                    .executeUpdate();
+
+            entityManager.createNativeQuery(
+                            "DELETE FROM zones WHERE city_id IN "
+                            + "(SELECT id FROM cities WHERE slug NOT IN (:slugs))")
+                    .setParameter("slugs", SEEDED_CITY_SLUGS)
+                    .executeUpdate();
+
+            entityManager.createNativeQuery("DELETE FROM cities WHERE slug NOT IN (:slugs)")
+                    .setParameter("slugs", SEEDED_CITY_SLUGS)
+                    .executeUpdate();
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Fixtures
+    // ------------------------------------------------------------------
+
+    /** Creates an active, verified user holding the named roles. */
+    @Transactional
+    protected User createUser(String email, String... roleNames) {
+        List<Role> roles = roleRepository.findByNameInAndDeletedAtIsNull(Set.of(roleNames));
+        if (roles.size() != roleNames.length) {
+            throw new IllegalStateException("Unknown role in " + List.of(roleNames)
+                                            + "; seeded roles come from migration V2");
+        }
+
+        User user = new User();
+        user.setEmail(email.toLowerCase());
+        user.setPasswordHash(passwordEncoder.encode(VALID_PASSWORD));
+        user.setFullName("Test " + email);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setEmailVerified(true);
+        user.setPasswordChangedAt(Instant.now());
+        user.getRoles().addAll(roles);
+        return userRepository.saveAndFlush(user);
+    }
+
+    /** Signs in through the real login endpoint and returns the issued tokens. */
+    protected Tokens login(String email, String password) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/auth/login", new AuthRequests.Login(email, password)))
+                .andReturn().getResponse().getContentAsString();
+        var node = objectMapper.readTree(body).path("data");
+        return new Tokens(node.path("accessToken").asText(), node.path("refreshToken").asText());
+    }
+
+    protected Tokens loginAs(String email, String... roleNames) throws Exception {
+        createUser(email, roleNames);
+        return login(email, VALID_PASSWORD);
+    }
+
+    // ------------------------------------------------------------------
+    // Request helpers
+    // ------------------------------------------------------------------
+
+    protected org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder post(
+            String path, Object body) throws Exception {
+        return org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body));
+    }
+
+    protected org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder authGet(
+            String path, String accessToken) {
+        return org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path)
+                .header("Authorization", "Bearer " + accessToken);
+    }
+
+    protected org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder authPost(
+            String path, String accessToken, Object body) throws Exception {
+        return org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path)
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body));
+    }
+
+    protected record Tokens(String accessToken, String refreshToken) {
+    }
+}

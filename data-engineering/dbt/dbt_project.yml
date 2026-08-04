@@ -1,0 +1,32 @@
+name: citypulse
+version: "1.0.0"
+config-version: 2
+profile: citypulse
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  citypulse:
+    # Staging stays as views: it is a rename-and-cast layer with no aggregation,
+    # so materialising it would duplicate every event row for no gain.
+    staging:
+      +materialized: view
+      +schema: staging
+    # Intermediate is ephemeral — inlined as CTEs into the marts that use it,
+    # so no intermediate table is left for anyone to query by mistake.
+    intermediate:
+      +materialized: ephemeral
+    # Marts are tables: they are what the API and analytics read, and a table
+    # is what keeps a dashboard query off a multi-million-row scan.
+    marts:
+      +materialized: table
+      +schema: marts
+
+# Fail the run on anything worse than a warning, so a broken model cannot be
+# published silently (PRD §34: tests block the pipeline).
+tests:
+  citypulse:
+    +severity: error

@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: dim_zone
+    description: Zone dimension joined to its city.
+    columns:
+      - name: zone_id
+        tests: [not_null, unique]
+      - name: zone_code
+        tests: [not_null, unique]
+      - name: city_slug
+        tests: [not_null]
+      - name: timezone
+        tests: [not_null]
+
+  - name: fct_zone_conditions_hourly
+    description: >
+      One row per zone per hour with traffic, air quality, weather, incidents
+      and events side by side. The grain the analytics and forecast layers read.
+    tests:
+      # The grain claim itself, asserted rather than assumed: a duplicated
+      # zone-hour would double every downstream sum with no other symptom.
+      - unique_zone_hour
+    columns:
+      - name: zone_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_zone')
+                field: zone_id
+      - name: event_hour
+        tests: [not_null]
+      - name: traffic_readings
+        tests: [not_null]
+      - name: avg_speed_kph
+        tests: [not_null]
+      - name: avg_occupancy_ratio
+        tests: [not_null]
+      - name: open_incidents
+        tests: [not_null]
+      - name: active_events
+        tests: [not_null]
+      - name: hour_of_day
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                         13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+                quote: false
+      - name: day_of_week
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5, 6]
+                quote: false
+      - name: demo_data
+        tests: [not_null]
+
+  - name: agg_zone_daily
+    description: Daily rollup of the hourly fact.
+    columns:
+      - name: zone_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_zone')
+                field: zone_id
+      - name: day
+        tests: [not_null]
+      - name: hours_observed
+        tests: [not_null]
+
+  - name: agg_pipeline_quality_daily
+    description: >
+      Daily ingestion health. This is the model behind the phase exit criterion
+      that data quality metrics are queryable.
+    columns:
+      - name: day
+        tests: [not_null, unique]
+      - name: records_ingested
+        tests: [not_null]
+      - name: records_rejected
+        tests: [not_null]

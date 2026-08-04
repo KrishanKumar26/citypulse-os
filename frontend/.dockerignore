@@ -1,0 +1,21 @@
+node_modules
+.next
+out
+dist
+coverage
+.git
+.gitignore
+Dockerfile
+.dockerignore
+# Never copied into an image: a build arg or runtime env supplies configuration.
+.env
+.env.*
+!.env.example
+npm-debug.log*
+.DS_Store
+README.md
+**/*.test.ts
+**/*.test.tsx
+src/test
+playwright-report
+test-results

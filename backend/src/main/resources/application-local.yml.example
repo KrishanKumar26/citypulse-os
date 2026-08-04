@@ -1,0 +1,16 @@
+# Copy to application-local.yml (git-ignored) only if you prefer file-based
+# config over environment variables. The .env route is the documented default.
+#
+# NEVER commit application-local.yml.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/citypulse
+    username: citypulse
+    password: change-me-locally
+
+citypulse:
+  security:
+    jwt:
+      # Generate your own: openssl rand -base64 48
+      secret: replace-with-a-locally-generated-48-byte-secret

@@ -1,0 +1,84 @@
+# Kafka topic definitions (PRD §20).
+#
+# Naming: citypulse.<domain>.v<schema-version>. The version lives in the topic
+# name and not only in the payload, so an incompatible schema change becomes a
+# new topic that existing consumers keep reading from — rather than a change
+# that breaks them silently at the next deploy.
+#
+# Partitioning: events are keyed by zone (weather by city — see
+# common/events.partition_key), so one place's events land on one partition and
+# stay in order. Windowed aggregation downstream depends on that ordering.
+#
+# Partition counts are sized for the seeded demo (20 zones, 3 cities), not for a
+# hypothetical scale. Partitions can be added later but never removed, and
+# over-partitioning now costs open file handles and rebalance time for
+# throughput nothing is asking for.
+
+topics:
+  - name: citypulse.traffic.v1
+    partitions: 6
+    replication_factor: 1 # Single broker locally; production overrides to 3.
+    description: Per-zone traffic readings. The highest-volume topic by far.
+    configs:
+      compression.type: producer
+      min.insync.replicas: "1"
+      # Seven days: long enough to replay a week into a rebuilt curated layer
+      # without having to go back to the lake.
+      retention.ms: "604800000"
+      # 256 MB segments, so retention deletes in reasonable chunks.
+      segment.bytes: "268435456"
+
+  - name: citypulse.weather.v1
+    partitions: 3
+    replication_factor: 1
+    description: City-level weather. One partition per seeded city.
+    configs:
+      compression.type: producer
+      min.insync.replicas: "1"
+      retention.ms: "604800000"
+
+  - name: citypulse.air-quality.v1
+    partitions: 3
+    replication_factor: 1
+    description: Per-zone air quality readings.
+    configs:
+      compression.type: producer
+      min.insync.replicas: "1"
+      retention.ms: "604800000"
+
+  - name: citypulse.incidents.v1
+    partitions: 3
+    replication_factor: 1
+    description: >
+      Incident lifecycle events. An incident is reported repeatedly as it moves
+      from REPORTED to CLEARED, so a consumer must reconcile by external_id
+      rather than treat each message as a distinct incident.
+    configs:
+      compression.type: producer
+      min.insync.replicas: "1"
+      # 30 days: incidents are referenced long after they close.
+      retention.ms: "2592000000"
+
+  - name: citypulse.city-events.v1
+    partitions: 3
+    replication_factor: 1
+    description: Scheduled events. Low volume, long horizon.
+    configs:
+      compression.type: producer
+      min.insync.replicas: "1"
+      retention.ms: "2592000000"
+
+  - name: citypulse.dlq.v1
+    partitions: 3
+    replication_factor: 1
+    description: >
+      Records rejected by stream validation, republished with their reason code.
+      The database DLQ table is the queryable record; this topic exists so a
+      rejected record can be re-driven after a fix without replaying the entire
+      source topic.
+    configs:
+      compression.type: producer
+      min.insync.replicas: "1"
+      # Longer than the source topics deliberately: a rejection may go unnoticed
+      # for days, and the evidence is useless once it has expired.
+      retention.ms: "2592000000"

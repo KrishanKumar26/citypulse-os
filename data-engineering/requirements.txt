@@ -1,0 +1,28 @@
+# Data platform runtime dependencies.
+#
+# Python 3.12 — PySpark and Airflow do not support 3.14, which is this
+# machine's default (docs/ARCHITECTURE.md §2). Create the environment with
+# `python3.12 -m venv .venv`, not the bare `python3`.
+
+# PostgreSQL driver for the generator, loader and local runner.
+psycopg[binary]==3.2.3
+
+# Kafka client. Imported lazily by generator/sinks.py so the JSONL and stdout
+# sinks keep working on a machine with no broker installed.
+#
+# 3.x, not the long-standing 2.0.2: that release predates Python 3.12 and dies
+# on import with `No module named 'kafka.vendor.six.moves'`. The failure is
+# invisible until something actually talks to a broker, because the import is
+# lazy — so it looked fine right up to the first real Kafka run.
+kafka-python==3.0.9
+
+# Transformation layer (PRD §24). Pulls dbt-core in as a dependency.
+dbt-postgres==1.9.0
+
+# Certificate bundle.
+#
+# Not decorative: the python.org macOS build ships without a usable trust
+# store, so any package whose build step fetches over HTTPS — dbt-core's does —
+# fails with CERTIFICATE_VERIFY_FAILED. Installing certifi and exporting
+# SSL_CERT_FILE fixes it without modifying the system Python. See README.md.
+certifi>=2024.7.4

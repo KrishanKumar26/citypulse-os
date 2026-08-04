@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/*
+ * CityPulse OS design tokens (PRD §32).
+ *
+ * Dark, premium, minimal, enterprise-grade. The palette is deliberately narrow:
+ * a near-black surface ramp, one accent, and a semantic status scale. Anything
+ * outside these tokens should not appear in a component.
+ *
+ * Explicitly avoided, per the PRD: heavy gradients, glow effects, cyberpunk
+ * styling, and decorative animation. Emphasis comes from spacing, weight, and
+ * hierarchy rather than colour.
+ */
+@theme {
+  /* Surfaces — lowest to highest elevation */
+  --color-surface-base: #08090c;
+  --color-surface-raised: #0e1015;
+  --color-surface-overlay: #14171e;
+  --color-surface-hover: #1a1e27;
+
+  /* Borders */
+  --color-line-subtle: #1c202a;
+  --color-line-default: #262b37;
+  --color-line-strong: #363d4d;
+
+  /* Text — the ramp carries hierarchy, so most text is not pure white */
+  --color-content-primary: #f2f4f8;
+  --color-content-secondary: #a8b0c0;
+  --color-content-tertiary: #6b7488;
+  --color-content-disabled: #454c5c;
+
+  /* Accent */
+  --color-accent: #3d7dff;
+  --color-accent-hover: #5590ff;
+  --color-accent-muted: #1a2f5c;
+  --color-accent-subtle: #101c33;
+
+  /*
+   * Status scale, used for both alerts and the four city-condition states in
+   * PRD §9 (Normal / Moderate / High / Critical). One scale for both keeps a
+   * given colour meaning exactly one level of concern anywhere in the product.
+   */
+  --color-status-normal: #2fb37a;
+  --color-status-normal-bg: #0d2119;
+  --color-status-moderate: #d9a227;
+  --color-status-moderate-bg: #241c08;
+  --color-status-high: #e07a3c;
+  --color-status-high-bg: #26160a;
+  --color-status-critical: #e5484d;
+  --color-status-critical-bg: #2a1113;
+
+  --color-info: #4a9eda;
+  --color-info-bg: #0c1c28;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-surface-base);
+    color: var(--color-content-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Visible focus is a requirement, not a preference (PRD §32 accessibility). */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-muted);
+    color: var(--color-content-primary);
+  }
+}
+
+@layer utilities {
+  /* Tabular figures stop metric values jittering as they update. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-raised) 0%,
+      var(--color-surface-hover) 50%,
+      var(--color-surface-raised) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /*
+   * The one moving element in the product: a live-data indicator. It signals
+   * that the stream is connected, which is information, not decoration.
+   */
+  .pulse-dot {
+    animation: pulse-fade 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-fade {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton,
+    .pulse-dot {
+      animation: none;
+    }
+  }
+}

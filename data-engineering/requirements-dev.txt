@@ -1,0 +1,12 @@
+-r requirements.txt
+pytest==8.3.4
+
+# Spark, for running pipeline/spark_job.py outside a container.
+#
+# Version 4.x, not 3.5: Spark added Java 21 support in 4.0, and 21 is the only
+# JDK on the development machine. The Dockerfile.spark image already ships
+# PySpark, so this is a development dependency only — installing it into the
+# container as well would shadow the build the JVM side expects.
+#
+# The install needs roughly 2 GB of working space to unpack and build.
+pyspark==4.0.0
