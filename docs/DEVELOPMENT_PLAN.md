@@ -492,16 +492,103 @@ for 5432 presents as a mass test failure rather than as a configuration problem.
 
 ---
 
-## Phase 7 — AI Intelligence & City Memory · `PENDING`
+## Phase 7 — AI Intelligence & City Memory · `DONE`
 
 Correlation engine · City Memory situation index and similarity search ·
 `RuleBasedProvider` explanations · recommendation catalogue · anomaly detection.
 
 **Exit criteria**
-- [ ] Explanations cite the data that produced them
-- [ ] Similar historical situations are retrieved with real outcome deltas
-- [ ] Insufficient data produces an explicit "insufficient data" response, never a guess
-- [ ] Anomaly detection is measured for precision on labelled synthetic injections
+- [x] Explanations cite the data that produced them
+- [x] Similar historical situations are retrieved with real outcome deltas
+- [x] Insufficient data produces an explicit "insufficient data" response, never a guess
+- [x] Anomaly detection is measured for precision on labelled synthetic injections
+
+**Anomalies are not alerts.** The V6 alerting fires on fixed thresholds —
+occupancy above 1.0. This is a different thing: a departure from what *this
+zone* normally does at *this hour of the week*. Eight thousand vehicles is
+unremarkable on a Tuesday morning and a genuine anomaly at 3 a.m., and no
+threshold can express that. Baselines are learned per zone, per metric, per
+hour-of-week: 168 buckets, because Tuesday 09:00 and Sunday 09:00 are not the
+same city.
+
+**Robust statistics throughout.** Median and median absolute deviation rather
+than mean and standard deviation, because a baseline learned from history
+containing anomalies *absorbs* them with a mean — the spikes the detector exists
+to find would raise the normal it compares against, and sensitivity would
+quietly degrade as more anomalies occurred.
+
+**Measured precision** (`python -m intelligence.evaluate`, four weeks, 25% held
+back, 5% of held-out windows given injections of known magnitude):
+
+| Metric | Precision | Recall | F1 |
+|---|---|---|---|
+| vehicle_count | 0.823 | 0.822 | 0.822 |
+| average_speed_kph | 0.749 | 0.885 | 0.811 |
+| occupancy_ratio | 0.508 | 0.763 | 0.610 |
+| **Overall** | **0.670** | **0.823** | **0.739** |
+
+The harsh figure counts every unlabelled flag as wrong. **64% of those flags
+coincided with rain, an open incident or a scheduled event** — exactly what the
+platform exists to notice — and counting those as genuine gives precision
+**0.849**. Both numbers are reported because neither is the whole truth: one
+assumes every unlabelled flag is a mistake, the other assumes every plausible
+one is real.
+
+**A finding the measurement forced.** At 3.5σ the detector produced a 4%
+false-positive rate on occupancy — roughly eighty times what that threshold
+implies for normally distributed data. Traffic occupancy is a product of peak
+demand, weather and incidents, so its tails are far fatter than normal. The
+response was an operational criterion rather than a fitted knob: an anomaly must
+be *materially* different (≥20% from normal) as well as statistically unusual. A
+window 3.5σ out but 8% from normal is a curiosity, and a feed of those is a feed
+that gets muted.
+
+**City Memory returns measurements, not predictions.** A situation is a coarse
+fingerprint — rain band, day type, hour band, event presence, incident band —
+paired with what *actually followed* over the next two hours. Coarse on purpose:
+matching exact values would make every situation unique and the memory useless.
+
+> *"Dry conditions during the evening peak has occurred 550 times before. Over
+> the following two hours, congestion typically rose 11% and speed fell 15%."*
+
+And when it cannot say:
+
+> *"Heavy rain overnight with an event under way has been observed only 0 times,
+> which is fewer than the 5 needed before a historical pattern means anything.
+> No outcome is reported rather than a figure drawn from too little."*
+
+**Correlations are measured, and disclaim causation in the payload itself.**
+Every response carries `impliesCausation: false` alongside the window counts, so
+a client cannot present co-occurrence as cause by omission. Rain and congestion
+rise together partly because both are heavier at the same times of day, and
+nothing here separates that from rain making traffic worse.
+
+Measured on 65,248 windows:
+
+| Coincidence | Lift | When the first holds |
+|---|---|---|
+| Poor air → high composite risk | 5.2× | 76% |
+| Open incident → traffic below 15 km/h | 2.7× | 26% |
+| Heavy rain → critical congestion | 2.2× | 31% |
+
+**Explanations are rule-based, deliberately.** The PRD calls for a
+`RuleBasedProvider` behind an interface a language model could later sit behind,
+and the ordering matters: a generated sentence can be fluent and wrong, while a
+template over measured numbers cannot drift from its evidence.
+
+**Verified 2026-08-04:**
+
+| Check | Result |
+|---|---|
+| Detection unit tests | **24 pass** — robustness, declining, materiality, severity, explanation form |
+| Intelligence API tests | **8 pass** — provenance, causation disclaimer, sufficient and insufficient recall |
+| Jobs over four weeks | 13,440 baselines · 13,560 situations · 30 correlations |
+
+**A defect the tests found.** The anomaly query used the common
+`(:param IS NULL OR column = :param)` idiom for optional filters. PostgreSQL
+cannot infer a type for a null bind inside an `IS NULL` test and rejects the
+statement with *"could not determine data type of parameter $2"* — so every
+request to the endpoint returned 500. Replaced with two explicit query methods.
 
 ---
 

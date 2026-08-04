@@ -499,3 +499,88 @@ export interface SimulationSummary {
   simulatedRisk: string | null;
   zonesAffected: number;
 }
+
+// --- Intelligence (PRD §12, §13, §16) ---------------------------------------
+
+export type AnomalyType = "SPIKE" | "DROP" | "SUSTAINED_SHIFT";
+
+/**
+ * A departure from what a zone normally does at this hour.
+ *
+ * Distinct from an Alert, which fires on a fixed threshold: 8,000 vehicles is
+ * unremarkable on a Tuesday morning and an anomaly at 3 a.m.
+ */
+export interface AnomalyDetail {
+  id: string;
+  zoneId: string;
+  zoneCode: string;
+  zoneName: string;
+  metric: string;
+  anomalyType: AnomalyType;
+  severity: AlertSeverity;
+  windowStart: string;
+  observedValue: string;
+  /** What this zone normally does at this hour of the week. */
+  baselineValue: string;
+  deviationScore: string;
+  percentChange: string | null;
+  /** Historical windows the baseline rests on. */
+  baselineSamples: number;
+  explanation: string;
+  detectedAt: string;
+  demoData: boolean;
+}
+
+export interface Correlation {
+  conditionA: string;
+  conditionB: string;
+  statement: string;
+  /** P(B|A)/P(B). Above 1 means A raises the odds of B. */
+  lift: string;
+  confidence: string;
+  windowsWithA: number;
+  windowsWithBoth: number;
+  windowsTotal: number;
+  /** Always false — measured co-occurrence, never a causal claim. */
+  impliesCausation: boolean;
+}
+
+export interface RecalledSituation {
+  zoneCode: string;
+  zoneName: string;
+  occurredAt: string;
+  occupancyAtStart: string | null;
+  peakOccupancy: string | null;
+  occupancyChangePct: string | null;
+  speedChangePct: string | null;
+  riskChangePct: string | null;
+  outcomeHorizonMinutes: number;
+}
+
+export interface MemoryRecall {
+  rainBand: string;
+  dayType: string;
+  hourBand: string;
+  hadEvent: boolean;
+  incidentBand: string;
+  /** False when too few comparable situations exist to say anything. */
+  sufficientData: boolean;
+  insufficientReason: string | null;
+  /** True when the exact fingerprint was too rare and the match was widened. */
+  relaxedMatch: boolean;
+  matchCount: number;
+  medianOccupancyChangePct: string | null;
+  medianSpeedChangePct: string | null;
+  medianRiskChangePct: string | null;
+  summary: string;
+  examples: RecalledSituation[];
+}
+
+export interface InsightsSummary {
+  citySlug: string;
+  anomaliesLast24h: number;
+  topAnomalies: AnomalyDetail[];
+  correlations: Correlation[];
+  currentSituation: MemoryRecall | null;
+  baselineBuckets: number;
+}

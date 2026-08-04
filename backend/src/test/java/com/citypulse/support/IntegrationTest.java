@@ -131,6 +131,13 @@ public abstract class IntegrationTest {
                             "TRUNCATE TABLE simulation_results, simulations RESTART IDENTITY CASCADE")
                     .executeUpdate();
 
+            // Intelligence outputs. A leftover anomaly or correlation would
+            // appear in another test's summary and be counted as its own.
+            entityManager.createNativeQuery(
+                            "TRUNCATE TABLE anomalies, situation_memory, condition_correlations, "
+                            + "zone_baselines RESTART IDENTITY CASCADE")
+                    .executeUpdate();
+
             entityManager.createNativeQuery(
                             "DELETE FROM zones WHERE city_id IN "
                             + "(SELECT id FROM cities WHERE slug NOT IN (:slugs))")

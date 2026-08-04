@@ -19,6 +19,10 @@ import type {
   RunScenarioRequest,
   SimulationDetail,
   SimulationSummary,
+  AnomalyDetail,
+  Correlation,
+  InsightsSummary,
+  MemoryRecall,
 } from "./types";
 
 /**
@@ -144,4 +148,30 @@ export const simulationApi = {
     api.get<PageResponse<SimulationSummary>>(
       `/api/v1/simulations?citySlug=${citySlug}&size=${size}`,
     ),
+};
+
+export const intelligenceApi = {
+  /** Anomalies ordered by how far from normal they were. */
+  anomalies: (citySlug: string, hours = 24, size = 50) =>
+    api.get<PageResponse<AnomalyDetail>>(
+      `/api/v1/anomalies?citySlug=${citySlug}&hours=${hours}&size=${size}`,
+    ),
+
+  correlations: (citySlug: string) =>
+    api.get<Correlation[]>(`/api/v1/anomalies/correlations?citySlug=${citySlug}`),
+
+  /** What historically followed conditions like these. */
+  memory: (
+    citySlug: string,
+    params: { rainBand?: string; dayType?: string; hourBand?: string; hadEvent?: boolean; incidentBand?: string } = {},
+  ) => {
+    const query = new URLSearchParams({ citySlug });
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) query.set(key, String(value));
+    });
+    return api.get<MemoryRecall>(`/api/v1/anomalies/memory?${query}`);
+  },
+
+  insights: (citySlug: string) =>
+    api.get<InsightsSummary>(`/api/v1/anomalies/insights?citySlug=${citySlug}`),
 };

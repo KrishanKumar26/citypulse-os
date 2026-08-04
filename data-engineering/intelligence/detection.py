@@ -1,0 +1,327 @@
+"""Anomaly detection statistics (PRD §13).
+
+Pure functions over numbers — no database, no I/O — so the behaviour that
+matters can be tested directly rather than inferred from what a job produced.
+
+The central choice here is **robust statistics**. A baseline learned with a mean
+and standard deviation from history that contains anomalies absorbs them: the
+spikes the detector exists to find raise the "normal" it compares against, and
+sensitivity quietly degrades as more anomalies occur. A median barely moves, and
+the median absolute deviation is similarly resistant.
+
+The second choice is that **insufficient data produces no answer**. A bucket
+with three samples can make any value look extreme or ordinary depending on
+which three; declining to judge is the honest response, and PRD §15 requires it
+explicitly.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+from typing import Sequence
+from zoneinfo import ZoneInfo
+
+
+# Scales MAD to be comparable with a standard deviation on normally distributed
+# data, so the deviation score reads like a familiar z-score.
+MAD_TO_SIGMA = 1.4826
+
+# Below this a bucket cannot support a judgement. Four weeks of five-minute
+# windows gives roughly 48 samples per hour-of-week bucket, so this is a floor
+# for sparse zones and short histories rather than a routine constraint.
+MIN_BASELINE_SAMPLES = 12
+
+# Deviation thresholds, in robust sigmas.
+#
+# 3.5 rather than the conventional 3.0: at 3.0 a normally distributed metric
+# produces a false positive roughly once every 370 windows, which across 20
+# zones and 5 metrics is a few dozen a day — enough noise to make the feed
+# ignorable. The evaluation harness measures what this choice actually costs in
+# recall rather than assuming.
+THRESHOLD_LOW = 3.5
+THRESHOLD_MEDIUM = 5.0
+THRESHOLD_HIGH = 8.0
+THRESHOLD_CRITICAL = 12.0
+
+# A MAD of zero means the metric never varied in this bucket. Dividing by it
+# would make any deviation infinite, so a floor proportional to the median is
+# used instead — a perfectly flat history still allows *some* natural variation.
+MIN_MAD_FRACTION = 0.02
+
+# An anomaly must be materially different, not merely statistically unusual.
+#
+# Traffic metrics are heavy-tailed: occupancy is a product of peak demand,
+# weather and incidents, so its tails are far fatter than a normal distribution
+# and a sigma threshold alone over-flags. Measured on four weeks of history, the
+# sigma test alone produced a 4% false-positive rate on occupancy — roughly
+# eighty times what 3.5 sigma implies for normal data.
+#
+# Requiring a minimum relative change as well is not a tuning knob fitted to
+# that measurement; it is an operational criterion. A window 3.5 sigma from
+# normal but only 8% different from it is a statistical curiosity, not something
+# anyone would act on, and a feed full of those is a feed that gets muted.
+MIN_RELATIVE_CHANGE = 0.20
+
+
+class AnomalyType(StrEnum):
+    SPIKE = "SPIKE"
+    DROP = "DROP"
+    SUSTAINED_SHIFT = "SUSTAINED_SHIFT"
+
+
+class Severity(StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+@dataclass(slots=True, frozen=True)
+class Baseline:
+    """What a zone normally does for one metric at one hour of the week."""
+
+    metric: str
+    hour_of_week: int
+    median: float
+    mad: float
+    p10: float
+    p90: float
+    sample_count: int
+
+    @property
+    def is_usable(self) -> bool:
+        return self.sample_count >= MIN_BASELINE_SAMPLES
+
+    @property
+    def effective_mad(self) -> float:
+        """MAD with a floor, so a flat history cannot make every point extreme."""
+        return max(self.mad, abs(self.median) * MIN_MAD_FRACTION, 1e-6)
+
+
+@dataclass(slots=True, frozen=True)
+class Detection:
+    """A judged window. `is_anomaly` False still carries the score."""
+
+    is_anomaly: bool
+    deviation_score: float
+    anomaly_type: AnomalyType | None
+    severity: Severity | None
+    percent_change: float | None
+    explanation: str
+
+
+@dataclass(slots=True, frozen=True)
+class InsufficientData:
+    """No judgement was possible, and why.
+
+    A distinct type rather than a None or a False, because "we looked and found
+    nothing" and "we could not look" are different facts. Collapsing them would
+    let a zone with no baseline read as a zone behaving normally.
+    """
+
+    reason: str
+    sample_count: int
+
+
+def median(values: Sequence[float]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    if n == 0:
+        raise ValueError("median of an empty sequence")
+    mid = n // 2
+    return ordered[mid] if n % 2 else (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def median_absolute_deviation(values: Sequence[float]) -> float:
+    if not values:
+        raise ValueError("MAD of an empty sequence")
+    centre = median(values)
+    return median([abs(v - centre) for v in values])
+
+
+def percentile(values: Sequence[float], fraction: float) -> float:
+    if not values:
+        raise ValueError("percentile of an empty sequence")
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, int(round(fraction * (len(ordered) - 1)))))
+    return ordered[index]
+
+
+def hour_of_week(moment: datetime, timezone: str = "Asia/Kolkata") -> int:
+    """0 = Monday 00:00 through 167 = Sunday 23:00, in the city's own timezone.
+
+    168 buckets rather than 24 because Tuesday 09:00 and Sunday 09:00 are not
+    the same city, and a detector that treats them alike will flag every quiet
+    weekend morning as a drop.
+    """
+    local = moment.astimezone(ZoneInfo(timezone))
+    return local.weekday() * 24 + local.hour
+
+
+def learn_baseline(
+    metric: str,
+    bucket_hour: int,
+    values: Sequence[float],
+) -> Baseline | None:
+    """Summarise one (metric, hour-of-week) bucket.
+
+    Returns None for an empty bucket rather than a zeroed baseline: a baseline
+    of zero would make every real reading look like an enormous spike.
+    """
+    usable = [v for v in values if v is not None]
+    if not usable:
+        return None
+
+    return Baseline(
+        metric=metric,
+        hour_of_week=bucket_hour,
+        median=median(usable),
+        mad=median_absolute_deviation(usable),
+        p10=percentile(usable, 0.10),
+        p90=percentile(usable, 0.90),
+        sample_count=len(usable),
+    )
+
+
+def _severity(score: float) -> Severity:
+    if score >= THRESHOLD_CRITICAL:
+        return Severity.CRITICAL
+    if score >= THRESHOLD_HIGH:
+        return Severity.HIGH
+    if score >= THRESHOLD_MEDIUM:
+        return Severity.MEDIUM
+    return Severity.LOW
+
+
+def detect(
+    observed: float,
+    baseline: Baseline,
+    *,
+    metric_label: str | None = None,
+) -> Detection | InsufficientData:
+    """Judge one observation against what this zone normally does.
+
+    The explanation is built here rather than at render time so it is stored
+    with the anomaly and stays true after the code changes. It states the
+    observation, the normal, and the gap — which is the whole of PRD §13's
+    example: "17,800 against a normal of 8,000".
+    """
+    if not baseline.is_usable:
+        return InsufficientData(
+            reason=(
+                f"only {baseline.sample_count} historical windows for this zone and hour; "
+                f"{MIN_BASELINE_SAMPLES} are needed before a deviation means anything"
+            ),
+            sample_count=baseline.sample_count,
+        )
+
+    label = metric_label or baseline.metric.replace("_", " ")
+    deviation = abs(observed - baseline.median) / (baseline.effective_mad * MAD_TO_SIGMA)
+
+    percent_change = (
+        (observed / baseline.median - 1.0) * 100.0 if baseline.median else None
+    )
+
+    # Both tests must pass: statistically unusual *and* materially different.
+    # Either alone produces a feed nobody reads — the sigma test flags harmless
+    # wobble on heavy-tailed metrics, and a relative-change test alone flags
+    # every ordinary swing on a metric that naturally varies a lot.
+    relative_change = (
+        abs(observed - baseline.median) / abs(baseline.median) if baseline.median else float("inf")
+    )
+    material = relative_change >= MIN_RELATIVE_CHANGE
+
+    if deviation < THRESHOLD_LOW or not material:
+        reason = (
+            f"within the usual range for this zone at this hour"
+            if deviation < THRESHOLD_LOW
+            else f"unusual statistically but only {relative_change:.0%} from normal"
+        )
+        return Detection(
+            is_anomaly=False,
+            deviation_score=round(deviation, 4),
+            anomaly_type=None,
+            severity=None,
+            percent_change=None if percent_change is None else round(percent_change, 2),
+            explanation=(
+                f"{label} of {observed:,.2f} is {reason} (normally {baseline.median:,.2f})."
+            ),
+        )
+
+    kind = AnomalyType.SPIKE if observed > baseline.median else AnomalyType.DROP
+    direction = "above" if kind is AnomalyType.SPIKE else "below"
+    change = (
+        f" ({percent_change:+.0f}%)" if percent_change is not None else ""
+    )
+
+    return Detection(
+        is_anomaly=True,
+        deviation_score=round(deviation, 4),
+        anomaly_type=kind,
+        severity=_severity(deviation),
+        percent_change=None if percent_change is None else round(percent_change, 2),
+        explanation=(
+            f"{label} of {observed:,.2f} is {deviation:.1f} standard deviations {direction} "
+            f"the normal {baseline.median:,.2f} for this zone at this hour{change}. "
+            f"Baseline learned from {baseline.sample_count} historical windows."
+        ),
+    )
+
+
+def detect_sustained(
+    recent: Sequence[float],
+    baseline: Baseline,
+    *,
+    min_windows: int = 6,
+    metric_label: str | None = None,
+) -> Detection | InsufficientData | None:
+    """Flag a level that has moved and stayed moved.
+
+    A single window crossing the threshold is a spike; six consecutive windows
+    sitting on the wrong side of it is a different situation — congestion that
+    has settled in rather than a burst that will clear. Operationally they call
+    for different responses, so they are reported as different types.
+
+    Returns None when there is not enough recent history to judge persistence,
+    which is not the same as finding nothing.
+    """
+    if len(recent) < min_windows:
+        return None
+    if not baseline.is_usable:
+        return InsufficientData(
+            reason=f"only {baseline.sample_count} historical windows for this bucket",
+            sample_count=baseline.sample_count,
+        )
+
+    scale = baseline.effective_mad * MAD_TO_SIGMA
+    window = list(recent)[-min_windows:]
+
+    # Every window must deviate, and all in the same direction. A set that
+    # alternates above and below is noise, not a shift.
+    above = all((v - baseline.median) / scale > 2.0 for v in window)
+    below = all((baseline.median - v) / scale > 2.0 for v in window)
+    if not (above or below):
+        return None
+
+    mean_recent = sum(window) / len(window)
+    deviation = abs(mean_recent - baseline.median) / scale
+    percent_change = (
+        (mean_recent / baseline.median - 1.0) * 100.0 if baseline.median else None
+    )
+    label = metric_label or baseline.metric.replace("_", " ")
+    direction = "above" if above else "below"
+
+    return Detection(
+        is_anomaly=True,
+        deviation_score=round(deviation, 4),
+        anomaly_type=AnomalyType.SUSTAINED_SHIFT,
+        severity=_severity(deviation),
+        percent_change=None if percent_change is None else round(percent_change, 2),
+        explanation=(
+            f"{label} has stayed {direction} normal for {min_windows} consecutive windows, "
+            f"averaging {mean_recent:,.2f} against a usual {baseline.median:,.2f}. "
+            f"A sustained shift rather than a momentary spike."
+        ),
+    )
