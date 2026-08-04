@@ -48,20 +48,52 @@ with psycopg.connect(os.environ["CITYPULSE_PG_DSN"]) as c, c.cursor() as cur:
     print(f"    schema present, {zones} zones")
 PY
 
-FROM=$(date -u -d "$DAYS days ago" +%Y-%m-%dT00:00:00Z 2>/dev/null \
-     || date -u -v-"${DAYS}"d +%Y-%m-%dT00:00:00Z)
-TO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Loaded one day at a time, not in one pass.
+#
+# A single load of four weeks is roughly 200,000 events over one connection.
+# Against a local database that is fine; against a hosted one across a network
+# it is not — the first attempt here died with "SSL SYSCALL error: EOF detected"
+# partway through, and because the loader commits at the end, the whole thing
+# rolled back and nothing landed.
+#
+# A day per iteration keeps each transaction small enough to survive the trip,
+# and a failure costs one day rather than the entire seed.
+echo "==> Generating and loading $DAYS days, one day at a time"
+loaded=0
+for offset in $(seq "$DAYS" -1 1); do
+  DAY_FROM=$(date -u -d "$offset days ago" +%Y-%m-%dT00:00:00Z 2>/dev/null \
+           || date -u -v-"${offset}"d +%Y-%m-%dT00:00:00Z)
+  NEXT=$((offset - 1))
+  if [ "$NEXT" -eq 0 ]; then
+    DAY_TO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  else
+    DAY_TO=$(date -u -d "$NEXT days ago" +%Y-%m-%dT00:00:00Z 2>/dev/null \
+           || date -u -v-"${NEXT}"d +%Y-%m-%dT00:00:00Z)
+  fi
 
-echo "==> Generating $DAYS days of telemetry ($FROM to $TO)"
-$PY -m generator.main --sink jsonl --out "$WORK/events.jsonl" --no-realtime \
-    --seed "$SEED" --tick-seconds 300 \
-    --simulate-from "$FROM" --simulate-to "$TO" --quiet
+  $PY -m generator.main --sink jsonl --out "$WORK/day.jsonl" --no-realtime \
+      --seed $((SEED + offset)) --tick-seconds 300 \
+      --simulate-from "$DAY_FROM" --simulate-to "$DAY_TO" --quiet
 
-echo "==> Loading through validation and windowing"
-# max-lateness is raised because this is a deliberate historical backfill; the
-# streaming watermark exists to reject genuinely stale live data, not this.
-$PY -m pipeline.local_runner --input "$WORK/events.jsonl" \
-    --max-lateness-hours $((DAYS * 24 + 24)) --quiet
+  # Retried once: a dropped connection to a hosted database is a transient
+  # condition, and losing a whole seed to one is not worth it.
+  if ! $PY -m pipeline.local_runner --input "$WORK/day.jsonl" \
+        --max-lateness-hours $((DAYS * 24 + 24)) --quiet 2>/dev/null; then
+    echo "    ${DAY_FROM%T*} failed, retrying once"
+    if ! $PY -m pipeline.local_runner --input "$WORK/day.jsonl" \
+          --max-lateness-hours $((DAYS * 24 + 24)) --quiet; then
+      echo "    ${DAY_FROM%T*} failed again — continuing without it"
+      continue
+    fi
+  fi
+  loaded=$((loaded + 1))
+  printf "    %s  (%d/%d)\n" "${DAY_FROM%T*}" "$loaded" "$DAYS"
+done
+
+if [ "$loaded" -eq 0 ]; then
+  echo "No days loaded. Nothing downstream can be built from an empty database."
+  exit 1
+fi
 
 echo "==> Training the forecast model"
 $PY -m ml.train --model-version v1 2>&1 | tail -3

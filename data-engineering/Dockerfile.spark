@@ -25,13 +25,29 @@ COPY common/ ./common/
 COPY pipeline/ ./pipeline/
 COPY generator/ ./generator/
 
-# The S3A connector for MinIO. Pinned to the Hadoop version this Spark build
-# links against; a mismatched aws-java-sdk is the usual cause of
-# NoSuchMethodError at the first lake write.
+# Connector jars, baked in rather than resolved at run time.
+#
+# `spark-submit --packages` downloads through Ivy into $HOME/.ivy2. The upstream
+# image runs as user 185 whose home is /nonexistent, so the container died at
+# startup with FileNotFoundException on the Ivy cache — found the first time the
+# whole stack was brought up in CI.
+#
+# Baking them in also removes a network fetch from every container start, which
+# is a second reason to prefer it: a Maven Central hiccup should not stop the
+# pipeline.
+#
+# Versions are pinned together on purpose. The Scala suffix must match the Spark
+# build (2.13 for Spark 4.x), and hadoop-aws must match the Hadoop that Spark
+# links against, or the failure is a NoSuchMethodError at first use rather than
+# a resolution error at startup.
 RUN mkdir -p /opt/spark/jars \
     && cd /opt/spark/jars \
     && curl -fsSLO https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar \
-    && curl -fsSLO https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.24.6/bundle-2.24.6.jar
+    && curl -fsSLO https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.24.6/bundle-2.24.6.jar \
+    && curl -fsSLO https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.13/4.0.0/spark-sql-kafka-0-10_2.13-4.0.0.jar \
+    && curl -fsSLO https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.13/4.0.0/spark-token-provider-kafka-0-10_2.13-4.0.0.jar \
+    && curl -fsSLO https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.9.0/kafka-clients-3.9.0.jar \
+    && curl -fsSLO https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.12.0/commons-pool2-2.12.0.jar
 
 COPY docker/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
 

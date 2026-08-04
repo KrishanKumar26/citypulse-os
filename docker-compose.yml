@@ -264,7 +264,10 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      postgres:
+      # The backend, not postgres. A healthy database only means it accepts
+      # connections; the tables this job writes to exist only after Flyway has
+      # run, and Flyway runs when the backend boots.
+      backend:
         condition: service_healthy
     environment:
       <<: *de-environment
@@ -278,8 +281,9 @@ services:
       - /opt/spark/bin/spark-submit
       - --master
       - local[2]
-      - --packages
-      - org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.0
+      # No --packages: the connector jars are baked into the image. Resolving
+      # them here writes to $HOME/.ivy2, and the image's user has no writable
+      # home — the container died on that the first time the stack ran in CI.
       - --conf
       - spark.driver.memory=1g
       - /opt/citypulse/data-engineering/pipeline/spark_job.py
@@ -303,7 +307,10 @@ services:
     depends_on:
       kafka-init:
         condition: service_completed_successfully
-      postgres:
+      # Waits for the backend so the schema exists. Starting on a healthy
+      # postgres alone failed with 'relation "cities" does not exist' — the
+      # generator reads the zone catalogue before it can emit anything.
+      backend:
         condition: service_healthy
     environment:
       <<: *de-environment

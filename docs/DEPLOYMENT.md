@@ -277,8 +277,23 @@ Noticeable on the first query, not after.
 
 ### Steps
 
-**1. Database.** Create a Neon project and copy the pooled connection string.
-Keep `?sslmode=require`.
+**1. Database.** Create a Neon project. It gives you two endpoints, and the
+difference matters:
+
+```
+pooled    ep-xxxx-pooler.region.aws.neon.tech    for the application
+direct    ep-xxxx.region.aws.neon.tech           for migrations
+```
+
+**Migrations must use the direct endpoint.** The pooled one runs PgBouncer in
+transaction mode, which cuts off a long DDL transaction partway through — the
+first attempt here died with `SQL State 08006, connection reset` while V10 was
+committing. Flyway rolled the whole migration back cleanly, so nothing was left
+half-applied, but the schema simply never arrived. The direct endpoint applied
+the same migration without complaint.
+
+Use the pooled endpoint for the running application, where short transactions
+are exactly what a pooler is good at.
 
 **2. Backend.** On Render, create a Blueprint from this repository — it reads
 `render.yaml`. Set the variables marked `sync: false`:
