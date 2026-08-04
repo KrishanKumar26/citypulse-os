@@ -93,6 +93,22 @@ public abstract class IntegrationTest {
     private static final List<String> SEEDED_CITY_SLUGS = List.of("bengaluru", "noida", "mumbai");
 
     /**
+     * Highest zone id that migration V3 seeded, read once on the first reset.
+     *
+     * <p>Static so it survives between test classes in a run: the first reset
+     * happens before any test has written, which is the only moment the seeded
+     * set can be identified without hard-coding a list of codes that would then
+     * have to be kept in step with V3 by hand.
+     *
+     * <p>This assumes the database starts at the migrated state — true of CI,
+     * which creates one per run, and of a fresh {@code createdb citypulse_test}.
+     * A database already carrying a zone left behind by an older build would
+     * have it counted as seeded and kept forever; recreate the database if the
+     * suite starts failing on duplicate zone codes.
+     */
+    private static Long seededZoneWatermark;
+
+    /**
      * Clears per-test data while leaving seeded reference data intact.
      *
      * <p>Roles and permissions come from migration V2 and the three demo cities
@@ -138,10 +154,25 @@ public abstract class IntegrationTest {
                             + "zone_baselines RESTART IDENTITY CASCADE")
                     .executeUpdate();
 
-            entityManager.createNativeQuery(
-                            "DELETE FROM zones WHERE city_id IN "
-                            + "(SELECT id FROM cities WHERE slug NOT IN (:slugs))")
-                    .setParameter("slugs", SEEDED_CITY_SLUGS)
+            // Any zone a test created, including one added to a seeded city.
+            //
+            // This used to delete only zones belonging to non-seeded cities,
+            // which left a hole: a test adding a zone to Bengaluru or Mumbai
+            // leaked it into every later test in the run. One doing exactly that
+            // turned five unrelated forecast tests into
+            // NonUniqueResultException, because a lookup by zone code suddenly
+            // matched two rows. That is the run-order flake the city cleanup
+            // below was written to prevent, and zones needed the same care.
+            //
+            // The watermark is read on the first reset, before any test has
+            // written, so it is the id of the last zone migration V3 seeded.
+            if (seededZoneWatermark == null) {
+                seededZoneWatermark = ((Number) entityManager
+                        .createNativeQuery("SELECT coalesce(max(id), 0) FROM zones")
+                        .getSingleResult()).longValue();
+            }
+            entityManager.createNativeQuery("DELETE FROM zones WHERE id > :watermark")
+                    .setParameter("watermark", seededZoneWatermark)
                     .executeUpdate();
 
             entityManager.createNativeQuery("DELETE FROM cities WHERE slug NOT IN (:slugs)")

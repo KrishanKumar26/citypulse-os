@@ -17,9 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,16 +35,6 @@ import java.util.Optional;
 public class AlertEngine {
 
     private static final Logger log = LoggerFactory.getLogger(AlertEngine.class);
-
-    /**
-     * Granularity of the dedupe key's time component.
-     *
-     * <p>An hour is the point of the whole mechanism: a zone congested from 08:00
-     * to 09:00 produces one alert, not twelve five-minute ones. Making this
-     * shorter would reintroduce the flood; making it longer would hide a
-     * genuinely new episode later in the day behind an old alert.
-     */
-    private static final Duration DEDUPE_BUCKET = Duration.ofHours(1);
 
     private final ZoneRepository zoneRepository;
     private final ZoneMetricRepository metricRepository;
@@ -128,7 +116,7 @@ public class AlertEngine {
      * @return true when a new alert was created
      */
     private boolean raise(AlertRule rule, AlertRule.Finding finding, Zone zone, ZoneMetric metric) {
-        String key = dedupeKey(rule, zone, metric.getWindowStart());
+        String key = dedupeKey(rule, zone);
 
         Optional<Alert> existing = alertRepository.findOpenByDedupeKey(key);
         if (existing.isPresent()) {
@@ -173,12 +161,33 @@ public class AlertEngine {
     }
 
     /**
-     * Builds the suppression identity: rule, zone, and the hour the window falls in.
+     * Identity of a condition: the rule that fired and the place it fired on.
+     *
+     * <p>Deliberately carries no time component. It used to bucket the window
+     * start to the hour, which was wrong at every hour boundary — a zone
+     * congested from 08:55 to 09:55 landed in two buckets and raised two alerts,
+     * which is the alert fatigue the whole mechanism exists to prevent. It only
+     * behaved as documented for a condition that happened to start just after
+     * the hour, so it passed for months and failed one CI run at 18:57.
+     *
+     * <p>No time component is needed. A condition that persists keeps refreshing
+     * one open alert; a condition that stops has its alert closed by
+     * {@link #autoResolveStale()} once the evidence ages past
+     * {@code telemetry.max-age}; a genuinely new episode afterwards finds
+     * nothing open and raises fresh. The partial unique index is on open alerts
+     * only, so reusing the key is exactly what it allows.
+     *
+     * <p>Keyed on the zone's id, not its code. Zone codes are unique only within
+     * a city ({@code uq_zones_city_code_active}), so two cities that both use a
+     * code like {@code CBD} would produce one key between them — and because the
+     * unique index would reject the second insert, the engine would log it as a
+     * lost race and drop a real alert for a different city on the floor. The
+     * previous key had the same flaw, hidden behind demo codes that happen to
+     * carry a city prefix. The alert row records rule_code and zone_id anyway,
+     * so nothing needs the key itself to be readable.
      */
-    private String dedupeKey(AlertRule rule, Zone zone, Instant windowStart) {
-        Instant bucket = windowStart.truncatedTo(ChronoUnit.SECONDS)
-                .minusSeconds(windowStart.getEpochSecond() % DEDUPE_BUCKET.toSeconds());
-        return "%s:%s:%s".formatted(rule.code(), zone.getCode(), bucket);
+    private String dedupeKey(AlertRule rule, Zone zone) {
+        return "%s:%d".formatted(rule.code(), zone.getId());
     }
 
     /**

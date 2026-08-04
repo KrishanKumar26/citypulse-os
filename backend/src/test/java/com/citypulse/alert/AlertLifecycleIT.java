@@ -156,6 +156,68 @@ class AlertLifecycleIT extends IntegrationTest {
                 .allSatisfy(a -> assertThat(a.getZoneMetricWindowStart()).isEqualTo(second));
     }
 
+    @Test
+    @DisplayName("a condition spanning an hour boundary stays one alert")
+    void doesNotReRaiseAcrossTheHourBoundary() {
+        // Deliberately straddling :00. The dedupe key used to bucket the window
+        // start to the hour, so 08:55 and 09:00 were different conditions and the
+        // second raised a second alert — the fatigue deduplication exists to
+        // prevent, on a zone that never stopped being congested.
+        //
+        // The old test could only catch this when it happened to run in the last
+        // five minutes of an hour, which is why it survived until one CI run
+        // started at 18:57. These two windows straddle the boundary whatever the
+        // clock says, and both stay inside telemetry.max-age.
+        Instant topOfHour = Instant.now().truncatedTo(ChronoUnit.HOURS);
+        Instant before = topOfHour.minus(5, ChronoUnit.MINUTES);
+
+        insertSevereWindow("BLR-WHF", before);
+        alertEngine.evaluate();
+        long afterFirst = alertRepository.count();
+
+        insertSevereWindow("BLR-WHF", topOfHour);
+        alertEngine.evaluate();
+
+        assertThat(alertRepository.count())
+                .as("crossing :00 must refresh the open alert, not raise a second one")
+                .isEqualTo(afterFirst);
+        assertThat(alertRepository.findAll())
+                .filteredOn(a -> "SEVERE_CONGESTION".equals(a.getRuleCode()))
+                .allSatisfy(a -> assertThat(a.getZoneMetricWindowStart()).isEqualTo(topOfHour));
+    }
+
+    @Test
+    @DisplayName("two cities sharing a zone code each get their own alert")
+    void doesNotCollideAcrossCities() {
+        // Zone codes are unique within a city, not globally
+        // (uq_zones_city_code_active). A key built from the code alone would give
+        // both zones the same identity, and the partial unique index would reject
+        // the second insert — which the engine logs as a lost race and drops. A
+        // real alert for one city would vanish because another city named a zone
+        // the same thing.
+        //
+        // The demo geography prefixes every code with its city, so this never
+        // occurred naturally. That is what kept it hidden, not what made it safe.
+        transactionTemplate.executeWithoutResult(status ->
+                entityManager.createNativeQuery("""
+                        INSERT INTO zones (uid, city_id, code, name, zone_type,
+                            center_latitude, center_longitude, area_sq_km, population,
+                            road_capacity_vph, active)
+                        SELECT gen_random_uuid(), c.id, 'BLR-WHF', 'Same code, other city',
+                               'COMMERCIAL', 19.0760, 72.8777, 5.0, 100000, 4000, TRUE
+                        FROM cities c WHERE c.slug = 'mumbai'
+                        """).executeUpdate());
+
+        Instant window = recentWindow();
+        insertSevereWindow("BLR-WHF", window);   // matches both zones now
+        alertEngine.evaluate();
+
+        assertThat(alertRepository.findAll())
+                .filteredOn(a -> "SEVERE_CONGESTION".equals(a.getRuleCode()))
+                .as("each zone is its own condition, whatever it is called")
+                .hasSize(2);
+    }
+
     // ------------------------------------------------------------------
     // Lifecycle
     // ------------------------------------------------------------------
