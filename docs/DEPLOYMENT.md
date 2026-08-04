@@ -14,12 +14,14 @@ Read this before anything else.
 | Local development (native processes) | **Verified** — this is how the platform was built and tested |
 | Kafka, MinIO, Spark individually in containers | **Verified** — each started and driven end to end |
 | Airflow image and DAG loading | **Verified** — image builds, both DAGs parse with no import errors |
-| All nine compose services together | **Never done** — see §5 |
-| CI container build | **Not built** — Phase 8 |
-| Cloud deployment | **Not built** — Phase 8 |
+| CI: build, test and scan on every push | **Verified** — six jobs, green |
+| CI container build and boot check | **Verified** — images build and the backend reports healthy |
+| All nine compose services together | **Attempted in CI** — see §5 |
+| Free-tier deployment (Neon + Render + Vercel) | **Written, not yet run** — see §9 |
+| AWS deployment | **Not built** — needs an account and a spend decision |
 
-Nothing here is a production deployment guide, because nothing has been deployed.
-What follows is accurate about what was run.
+Nothing here is a production deployment guide. What follows is accurate about
+what was run, and explicit about what was only written.
 
 ---
 
@@ -235,3 +237,97 @@ Not done, and not to be skipped:
    verification links are written to the log.
 6. **Container image scanning** in CI.
 7. **Backups** and a tested restore. An untested restore is not a backup.
+
+---
+
+## 9. Free-tier deployment
+
+A working public deployment at no cost, with limitations stated rather than
+discovered.
+
+| Component | Service | Free allowance |
+|---|---|---|
+| Database | Neon PostgreSQL | 500 MB — the seeded database is ~150 MB |
+| Backend | Render web service | 512 MB RAM, stopped when idle |
+| Frontend | Vercel | Generous for a project this size |
+| Data refresh | GitHub Actions | 2,000 minutes/month on a private repo |
+
+None requires a card.
+
+### What this costs you in behaviour
+
+**The backend stops after 15 minutes without traffic.** The next request waits
+for it to start — roughly a minute for a JVM. Anyone opening the dashboard cold
+sees a long pause and may conclude it is broken.
+
+There is deliberately no keep-warm workflow. Pinging every ten minutes would
+consume more than the entire free Actions allowance on nothing but pings. If
+warmth matters more than the allowance, an external uptime monitor (UptimeRobot
+and similar have free tiers) does the same job without spending it.
+
+**There is no live pipeline.** Kafka and Spark have no free tier worth the name.
+`refresh-demo-data.yml` runs the generator and the local pipeline runner every
+six hours instead — the same validation, windowing and load path, driven on a
+schedule rather than by a stream. Between runs the data ages, and the dashboard
+says so: a window older than two hours is marked stale, which is correct
+behaviour rather than a bug to hide.
+
+**Neon's compute suspends when idle** and resumes in a few hundred milliseconds.
+Noticeable on the first query, not after.
+
+### Steps
+
+**1. Database.** Create a Neon project and copy the pooled connection string.
+Keep `?sslmode=require`.
+
+**2. Backend.** On Render, create a Blueprint from this repository — it reads
+`render.yaml`. Set the variables marked `sync: false`:
+
+```
+CITYPULSE_DB_URL       jdbc:postgresql://<neon-host>/<db>?sslmode=require
+CITYPULSE_DB_USER      <neon user>
+CITYPULSE_DB_PASSWORD  <neon password>
+```
+
+Leave `CITYPULSE_FRONTEND_URL` and `CITYPULSE_CORS_ORIGINS` until step 3. Set
+`CITYPULSE_BOOTSTRAP_ADMIN_EMAIL` and `..._PASSWORD` to have an administrator
+created on first boot; leave them unset and the deployment has no accounts at
+all, which is the safer default if the URL is public.
+
+Note the JDBC form for the backend and the `postgresql://` form for the Python
+tooling. Same database, two dialects.
+
+Flyway migrates on boot. Watch the log until it reports the schema at the latest
+version.
+
+**3. Frontend.** Import the repository on Vercel, root directory `frontend`. Set
+`NEXT_PUBLIC_API_BASE_URL` to the Render URL. It is inlined at build time, so
+changing it later needs a rebuild, not just a restart.
+
+Then go back to Render and set `CITYPULSE_FRONTEND_URL` and
+`CITYPULSE_CORS_ORIGINS` to the Vercel URL. Without this the browser blocks
+every request and the dashboard is silently empty.
+
+**4. Data.** Everything renders empty until telemetry exists:
+
+```bash
+export CITYPULSE_PG_DSN='postgresql://user:pass@host/db?sslmode=require'
+bash data-engineering/scripts/seed_hosted.sh
+```
+
+Four weeks of history, then forecasts, accuracy scoring, baselines, anomalies,
+City Memory and the dbt marts — in that order, because each reads what the last
+one wrote. Roughly ten minutes.
+
+**5. Keep it current.** Add `HOSTED_PG_DSN` as a repository secret with the same
+connection string. The refresh workflow skips cleanly until it is set, so
+nothing fails in the meantime.
+
+### Before sharing the URL
+
+- `CITYPULSE_DEMO_MODE` stays `true`. The data is generated, and PRD §42 forbids
+  presenting it as real.
+- Use a real password for the bootstrap administrator. The deployment is
+  reachable by anyone with the link.
+- Neon's free tier has no point-in-time recovery. `pg_dump` before anything
+  destructive.

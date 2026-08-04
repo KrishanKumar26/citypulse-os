@@ -1,0 +1,132 @@
+# =============================================================================
+# Keep the deployed demo's data current.
+#
+# The dashboard treats a curated window older than two hours as stale and says
+# so — correctly, because a stalled pipeline must not look like a calm city. On
+# a free-tier deployment there is no Kafka and no Spark to keep writing, so
+# without this the demo is honestly-labelled stale within two hours of seeding.
+#
+# This runs the generator and the local pipeline runner against the hosted
+# database, which is the same validation, windowing and load path the streaming
+# job uses — see docs/DATA_PIPELINE.md §1.
+#
+# Budget: a private repository gets 2,000 free Actions minutes a month. Every
+# six hours is 120 runs at roughly three minutes — about 360 minutes, leaving
+# room for CI. A ten-minute keep-warm ping would alone cost more than the whole
+# allowance, which is why there is no keep-warm job; the cold start is
+# documented in docs/DEPLOYMENT.md instead.
+# =============================================================================
+
+name: Refresh demo data
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: "Hours of telemetry to generate"
+        required: false
+        default: "8"
+
+concurrency:
+  group: refresh-demo-data
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Generate and load recent telemetry
+    runs-on: ubuntu-latest
+    # Skips cleanly on a fork or before the secret is configured, rather than
+    # failing every six hours for a deployment that does not exist.
+    if: ${{ github.repository_owner != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: data-engineering/requirements.txt
+
+      - name: Check the deployment is configured
+        id: check
+        env:
+          DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: |
+          if [ -z "$DSN" ]; then
+            echo "HOSTED_PG_DSN is not set — no hosted database to refresh."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.configured == 'true'
+        working-directory: data-engineering
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate and load
+        if: steps.check.outputs.configured == 'true'
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: |
+          HOURS="${{ inputs.hours || '8' }}"
+          FROM=$(date -u -d "$HOURS hours ago" +%Y-%m-%dT%H:%M:%SZ)
+          TO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          # A fresh seed each run, derived from the date, so successive refreshes
+          # do not replay an identical day. Deterministic within a run, so a
+          # failure can be reproduced.
+          SEED=$(date -u +%Y%m%d%H)
+
+          python -m generator.main --sink jsonl --out /tmp/refresh.jsonl \
+            --no-realtime --seed "$SEED" --tick-seconds 300 \
+            --simulate-from "$FROM" --simulate-to "$TO" --quiet
+
+          python -m pipeline.local_runner --input /tmp/refresh.jsonl \
+            --max-lateness-hours $((HOURS + 2)) --quiet
+
+      - name: Issue forecasts and detect anomalies
+        if: steps.check.outputs.configured == 'true'
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        # Baselines are not relearned every cycle: they describe weeks of
+        # history and would barely move, while relearning is the slowest step
+        # here. The training job is run separately when the model should change.
+        run: |
+          python -m ml.predict 2>&1 | tail -1
+          python -m ml.score 2>&1 | head -2
+          python -m intelligence.jobs detect
+          python -m intelligence.jobs memory
+
+      - name: Report what landed
+        if: steps.check.outputs.configured == 'true'
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+          with psycopg.connect(os.environ["CITYPULSE_PG_DSN"]) as c, c.cursor() as cur:
+              cur.execute("""
+                  SELECT max(window_start),
+                         count(*) FILTER (WHERE window_start > now() - interval '8 hours'),
+                         pg_size_pretty(pg_database_size(current_database()))
+                  FROM zone_metrics
+              """)
+              newest, recent, size = cur.fetchone()
+              print(f"newest window: {newest}")
+              print(f"windows in the last 8h: {recent}")
+              print(f"database size: {size}")
+          PY

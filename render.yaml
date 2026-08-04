@@ -1,0 +1,88 @@
+# =============================================================================
+# Render — backend deployment (free tier)
+#
+#   Backend   Render web service, this file
+#   Database  Neon PostgreSQL, created separately
+#   Frontend  Vercel, see vercel.json
+#
+# Render's free tier is genuinely free and needs no card, but it has one
+# behaviour that shapes everything below: a free web service is stopped after
+# 15 minutes without traffic, and the next request waits for it to start again.
+# For a JVM that is roughly a minute. The keep-warm workflow in
+# .github/workflows/keep-warm.yml exists because of this, and the limitation is
+# documented in docs/DEPLOYMENT.md rather than hidden.
+#
+# The database is deliberately *not* declared here. Render's free PostgreSQL is
+# deleted after 90 days; Neon's free tier is not, and losing the database on a
+# date nobody wrote down is a worse trade than managing one more service.
+# =============================================================================
+
+services:
+  - type: web
+    name: citypulse-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: singapore   # Nearest to the seeded cities, which are Indian metros.
+    branch: main
+
+    healthCheckPath: /actuator/health
+
+    envVars:
+      # --- Database -------------------------------------------------------
+      # Set in the Render dashboard from the Neon connection string. Not here:
+      # a connection string in a committed file is a credential in a committed
+      # file, whatever the tier.
+      - key: CITYPULSE_DB_URL
+        sync: false
+      - key: CITYPULSE_DB_USER
+        sync: false
+      - key: CITYPULSE_DB_PASSWORD
+        sync: false
+
+      # --- Secrets --------------------------------------------------------
+      # generateValue asks Render to create a strong value once and keep it.
+      # Regenerating it would invalidate every issued token, so it must persist
+      # across deploys — which it does.
+      - key: CITYPULSE_JWT_SECRET
+        generateValue: true
+
+      # --- Application ----------------------------------------------------
+      - key: CITYPULSE_FRONTEND_URL
+        sync: false     # The Vercel URL, known only after the frontend deploys.
+      - key: CITYPULSE_CORS_ORIGINS
+        sync: false
+      - key: CITYPULSE_LOG_LEVEL
+        value: INFO
+
+      # The platform is serving generated telemetry. This must stay true until
+      # a real feed replaces it — PRD §42 forbids presenting synthetic data as
+      # real, and this flag is what the UI reads to label it.
+      - key: CITYPULSE_DEMO_MODE
+        value: "true"
+
+      # No mail provider is wired up. Requiring verification would lock every
+      # new account out, because the link only reaches the application log.
+      - key: CITYPULSE_REQUIRE_EMAIL_VERIFICATION
+        value: "false"
+
+      # --- First administrator --------------------------------------------
+      # Set both in the dashboard to have an account created on first boot.
+      # Leaving them unset creates nothing, which is the safer default for a
+      # publicly reachable deployment.
+      - key: CITYPULSE_BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: CITYPULSE_BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+
+      # --- JVM sizing -----------------------------------------------------
+      # The free instance has 512 MB. Left alone, the JVM sizes its heap as a
+      # fraction of *container* memory and is then killed when the rest of the
+      # process pushes it past the limit. Capping the heap at 300 MB leaves
+      # room for metaspace, thread stacks and the container itself.
+      #
+      # SerialGC rather than G1: on a single shared core, G1's background
+      # threads cost more than they return.
+      - key: JAVA_TOOL_OPTIONS
+        value: "-Xmx300m -Xms128m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m"
