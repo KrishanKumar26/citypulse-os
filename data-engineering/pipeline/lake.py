@@ -22,7 +22,7 @@ day, and small files are the classic way to make an object-store lake slow.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
+from common.compat import StrEnum
 from typing import Final
 
 

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
+from common.compat import StrEnum
 from typing import Sequence
 from zoneinfo import ZoneInfo
 
