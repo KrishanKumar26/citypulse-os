@@ -1,5 +1,6 @@
 package com.citypulse.simulation.domain;
 
+import com.citypulse.common.time.Timestamps;
 import com.citypulse.geo.domain.City;
 import com.citypulse.user.domain.User;
 import jakarta.persistence.*;
@@ -95,7 +96,7 @@ public class Simulation {
     private Integer computedMs;
 
     @Column(name = "created_at", nullable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Timestamps.now();
 
     @OneToMany(mappedBy = "simulation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SimulationResult> results = new ArrayList<>();

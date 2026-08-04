@@ -1,5 +1,6 @@
 package com.citypulse.alert.domain;
 
+import com.citypulse.common.time.Timestamps;
 import com.citypulse.geo.domain.City;
 import com.citypulse.geo.domain.Zone;
 import com.citypulse.user.domain.User;
@@ -99,7 +100,7 @@ public class Alert {
     // --- Lifecycle -----------------------------------------------------------
 
     @Column(name = "raised_at", nullable = false)
-    private Instant raisedAt = Instant.now();
+    private Instant raisedAt = Timestamps.now();
 
     @Column(name = "acknowledged_at")
     private Instant acknowledgedAt;
@@ -133,10 +134,10 @@ public class Alert {
     private boolean demoData = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Timestamps.now();
 
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt = Instant.now();
+    private Instant updatedAt = Timestamps.now();
 
     public boolean isOpen() {
         return status.isOpen();

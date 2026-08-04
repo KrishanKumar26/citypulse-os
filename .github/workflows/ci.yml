@@ -226,9 +226,26 @@ jobs:
           fetch-depth: 0
 
       - name: Scan history for committed secrets
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The action's own binary, run directly against the full history rather
+        # than via the action wrapper. The wrapper derives a commit range from
+        # the push event, and on the first push to a new repository that range
+        # includes the parent of the root commit — which does not exist, so git
+        # errors and the step fails having scanned nothing. A full scan has no
+        # such edge case and is fast at this repository's size.
+        run: |
+          VERSION=8.24.3
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --redact --no-banner --exit-code 1 \
+            --report-format sarif --report-path gitleaks.sarif
+
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          if-no-files-found: ignore
 
       - name: Set up Node ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4

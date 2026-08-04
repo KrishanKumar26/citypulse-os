@@ -1,5 +1,6 @@
 package com.citypulse.alert.service;
 
+import com.citypulse.common.time.Timestamps;
 import com.citypulse.alert.domain.Alert;
 import com.citypulse.alert.domain.AlertStatus;
 import com.citypulse.alert.repository.AlertRepository;
@@ -77,7 +78,7 @@ public class AlertEngine {
             initialDelayString = "${citypulse.telemetry.stream-interval:PT5S}",
             fixedDelayString = "${citypulse.alerting.interval:PT30S}")
     public void evaluate() {
-        Instant notBefore = Instant.now().minus(properties.maxAge());
+        Instant notBefore = Timestamps.now().minus(properties.maxAge());
         int raised = 0;
         int zonesChecked = 0;
 
@@ -137,7 +138,7 @@ public class AlertEngine {
             alert.setObservedValue(finding.observedValue());
             alert.setZoneMetricWindowStart(metric.getWindowStart());
             alert.setDescription(finding.description());
-            alert.setUpdatedAt(Instant.now());
+            alert.setUpdatedAt(Timestamps.now());
             alertRepository.save(alert);
             return false;
         }
@@ -190,9 +191,9 @@ public class AlertEngine {
      */
     @Transactional
     public int autoResolveStale() {
-        Instant cutoff = Instant.now().minus(properties.maxAge());
+        Instant cutoff = Timestamps.now().minus(properties.maxAge());
         List<Alert> stale = alertRepository.findStaleOpen(cutoff);
-        Instant now = Instant.now();
+        Instant now = Timestamps.now();
 
         for (Alert alert : stale) {
             alert.setStatus(AlertStatus.RESOLVED);

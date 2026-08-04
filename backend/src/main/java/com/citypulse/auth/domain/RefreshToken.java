@@ -1,5 +1,6 @@
 package com.citypulse.auth.domain;
 
+import com.citypulse.common.time.Timestamps;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -73,10 +74,10 @@ public class RefreshToken {
     private String userAgent;
 
     @Column(name = "created_at", nullable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Timestamps.now();
 
     public boolean isExpired() {
-        return expiresAt.isBefore(Instant.now());
+        return expiresAt.isBefore(Timestamps.now());
     }
 
     public boolean isConsumed() {

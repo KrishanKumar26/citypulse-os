@@ -26,3 +26,11 @@ dbt-postgres==1.9.0
 # fails with CERTIFICATE_VERIFY_FAILED. Installing certifi and exporting
 # SSL_CERT_FILE fixes it without modifying the system Python. See README.md.
 certifi>=2024.7.4
+
+# Linear algebra for the forecast baseline (ml/model.py). Ridge regression by the
+# normal equations is a 15x15 solve, so this is the only numerical dependency the
+# project needs — scikit-learn would add ~100 MB for convenience, not capability.
+#
+# Declared late: it was installed into a local venv during development and CI was
+# the thing that noticed requirements.txt did not mention it.
+numpy>=2.0

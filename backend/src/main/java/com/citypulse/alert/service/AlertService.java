@@ -1,5 +1,6 @@
 package com.citypulse.alert.service;
 
+import com.citypulse.common.time.Timestamps;
 import com.citypulse.alert.domain.Alert;
 import com.citypulse.alert.domain.AlertStatus;
 import com.citypulse.alert.dto.AlertResponses;
@@ -95,7 +96,7 @@ public class AlertService {
 
         User actor = userRepository.findByUidAndDeletedAtIsNull(currentUser.require().userUid())
                 .orElseThrow(() -> new Exceptions.NotFound("User", currentUser.require().userUid()));
-        Instant now = Instant.now();
+        Instant now = Timestamps.now();
 
         switch (next) {
             case ACKNOWLEDGED, INVESTIGATING -> {

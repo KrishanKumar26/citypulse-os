@@ -1,5 +1,6 @@
 package com.citypulse.auth.domain;
 
+import com.citypulse.common.time.Timestamps;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -51,9 +52,9 @@ public class UserToken {
     private Instant usedAt;
 
     @Column(name = "created_at", nullable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt = Timestamps.now();
 
     public boolean isUsable() {
-        return usedAt == null && expiresAt.isAfter(Instant.now());
+        return usedAt == null && expiresAt.isAfter(Timestamps.now());
     }
 }
