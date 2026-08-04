@@ -1,0 +1,20 @@
+# Known findings that have been remediated.
+#
+# Format: commit:path:rule:line
+#
+# This file acknowledges specific historical findings. It does not disable a
+# rule — an allowlist that told gitleaks to ignore key-shaped committed strings
+# would remove the check that matters most.
+
+# A throwaway AIRFLOW_FERNET_KEY written into the CI workflow's temporary .env.
+#
+# gitleaks was right to flag it: the value was base64 and key-shaped, and to a
+# scanner or a reader that is indistinguishable from a real key. It was never a
+# real secret — generated as a placeholder for a container that lives for the
+# length of one CI run, in a private repository, and used for nothing else.
+#
+# Fixed in e1b8d4c: every CI secret is now generated inside the step and masked
+# with ::add-mask::, so nothing key-shaped is committed. This entry covers only
+# the historical commit, which cannot be changed without rewriting published
+# history for a value that was never live.
+2cc27fda45789e8a732a954478e384436f1dc2c8:.github/workflows/ci.yml:generic-api-key:387
