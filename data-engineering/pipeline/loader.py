@@ -18,6 +18,8 @@ from datetime import datetime
 from typing import Any, Iterable, Sequence
 
 import psycopg
+
+from common.db import execute_batched
 from psycopg.rows import dict_row
 
 from common.events import OCCUPANCY_PRECISION
@@ -78,18 +80,17 @@ def write_traffic(connection: psycopg.Connection, payloads: Sequence[dict], ids:
         )
 
     rows = _rows(payloads, build)
-    with connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO traffic_events
-                (event_id, zone_id, source_id, event_time, vehicle_count,
-                 average_speed_kph, occupancy_ratio, congestion_level, demo_data)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (event_id) DO NOTHING
-            """,
-            rows,
-        )
-        return cursor.rowcount
+    return execute_batched(
+        connection,
+        """
+        INSERT INTO traffic_events
+            (event_id, zone_id, source_id, event_time, vehicle_count,
+             average_speed_kph, occupancy_ratio, congestion_level, demo_data)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (event_id) DO NOTHING
+        """,
+        rows,
+    )
 
 
 def write_weather(connection: psycopg.Connection, payloads: Sequence[dict], ids: Ids) -> int:
@@ -108,18 +109,17 @@ def write_weather(connection: psycopg.Connection, payloads: Sequence[dict], ids:
         p["condition"],
         p.get("demo_data", True),
     ))
-    with connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO weather_events
-                (event_id, city_id, source_id, event_time, temperature_c, humidity_pct,
-                 precipitation_mm_h, wind_speed_kph, visibility_km, condition, demo_data)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (event_id) DO NOTHING
-            """,
-            rows,
-        )
-        return cursor.rowcount
+    return execute_batched(
+        connection,
+        """
+        INSERT INTO weather_events
+            (event_id, city_id, source_id, event_time, temperature_c, humidity_pct,
+             precipitation_mm_h, wind_speed_kph, visibility_km, condition, demo_data)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (event_id) DO NOTHING
+        """,
+        rows,
+    )
 
 
 def write_air_quality(connection: psycopg.Connection, payloads: Sequence[dict], ids: Ids) -> int:
@@ -137,18 +137,17 @@ def write_air_quality(connection: psycopg.Connection, payloads: Sequence[dict], 
         str(aqi_category(int(p["aqi"]))),
         p.get("demo_data", True),
     ))
-    with connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO air_quality_events
-                (event_id, zone_id, source_id, event_time, aqi,
-                 pm25, pm10, no2, o3, co, category, demo_data)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (event_id) DO NOTHING
-            """,
-            rows,
-        )
-        return cursor.rowcount
+    return execute_batched(
+        connection,
+        """
+        INSERT INTO air_quality_events
+            (event_id, zone_id, source_id, event_time, aqi,
+             pm25, pm10, no2, o3, co, category, demo_data)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (event_id) DO NOTHING
+        """,
+        rows,
+    )
 
 
 def write_incidents(connection: psycopg.Connection, payloads: Sequence[dict], ids: Ids) -> int:
@@ -181,23 +180,22 @@ def write_incidents(connection: psycopg.Connection, payloads: Sequence[dict], id
         parse(p.get("resolved_at")),
         p.get("demo_data", True),
     ))
-    with connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO incidents
-                (uid, zone_id, source_id, external_id, incident_type, severity, status,
-                 description, latitude, longitude, lanes_blocked, started_at, resolved_at, demo_data)
-            VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (source_id, external_id) WHERE external_id IS NOT NULL
-            DO UPDATE SET
-                status      = EXCLUDED.status,
-                severity    = EXCLUDED.severity,
-                resolved_at = EXCLUDED.resolved_at,
-                updated_at  = now()
-            """,
-            rows,
-        )
-        return cursor.rowcount
+    return execute_batched(
+        connection,
+        """
+        INSERT INTO incidents
+            (uid, zone_id, source_id, external_id, incident_type, severity, status,
+             description, latitude, longitude, lanes_blocked, started_at, resolved_at, demo_data)
+        VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source_id, external_id) WHERE external_id IS NOT NULL
+        DO UPDATE SET
+            status      = EXCLUDED.status,
+            severity    = EXCLUDED.severity,
+            resolved_at = EXCLUDED.resolved_at,
+            updated_at  = now()
+        """,
+        rows,
+    )
 
 
 def write_city_events(connection: psycopg.Connection, payloads: Sequence[dict], ids: Ids) -> int:
@@ -221,23 +219,22 @@ def write_city_events(connection: psycopg.Connection, payloads: Sequence[dict], 
         p.get("status", "SCHEDULED"),
         p.get("demo_data", True),
     ))
-    with connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO city_events
-                (uid, zone_id, source_id, external_id, event_type, name, venue,
-                 expected_attendance, starts_at, ends_at, status, demo_data)
-            VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (source_id, external_id) WHERE external_id IS NOT NULL
-            DO UPDATE SET
-                status     = EXCLUDED.status,
-                starts_at  = EXCLUDED.starts_at,
-                ends_at    = EXCLUDED.ends_at,
-                updated_at = now()
-            """,
-            rows,
-        )
-        return cursor.rowcount
+    return execute_batched(
+        connection,
+        """
+        INSERT INTO city_events
+            (uid, zone_id, source_id, external_id, event_type, name, venue,
+             expected_attendance, starts_at, ends_at, status, demo_data)
+        VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source_id, external_id) WHERE external_id IS NOT NULL
+        DO UPDATE SET
+            status     = EXCLUDED.status,
+            starts_at  = EXCLUDED.starts_at,
+            ends_at    = EXCLUDED.ends_at,
+            updated_at = now()
+        """,
+        rows,
+    )
 
 
 # Column widths from V4__telemetry_schema.sql. Every value written to the DLQ is
@@ -284,16 +281,15 @@ def write_dlq(
     ]
     if not rows:
         return 0
-    with connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO ingestion_dlq
-                (uid, reason_code, reason_detail, raw_payload, event_type, event_time, topic)
-            VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s)
-            """,
-            rows,
-        )
-        return cursor.rowcount
+    return execute_batched(
+        connection,
+        """
+        INSERT INTO ingestion_dlq
+            (uid, reason_code, reason_detail, raw_payload, event_type, event_time, topic)
+        VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s)
+        """,
+        rows,
+    )
 
 
 def write_zone_metrics(connection: psycopg.Connection, windows: Sequence[dict]) -> int:
@@ -316,35 +312,34 @@ def write_zone_metrics(connection: psycopg.Connection, windows: Sequence[dict]) 
         )
         for w in windows
     ]
-    with connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO zone_metrics
-                (zone_id, window_start, window_end, vehicle_count, average_speed_kph,
-                 occupancy_ratio, congestion_level, aqi, aqi_category, temperature_c,
-                 precipitation_mm_h, weather_condition, active_incidents, active_events,
-                 risk_score, risk_level, sample_count, demo_data)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (zone_id, window_start, window_end) DO UPDATE SET
-                vehicle_count      = EXCLUDED.vehicle_count,
-                average_speed_kph  = EXCLUDED.average_speed_kph,
-                occupancy_ratio    = EXCLUDED.occupancy_ratio,
-                congestion_level   = EXCLUDED.congestion_level,
-                aqi                = EXCLUDED.aqi,
-                aqi_category       = EXCLUDED.aqi_category,
-                temperature_c      = EXCLUDED.temperature_c,
-                precipitation_mm_h = EXCLUDED.precipitation_mm_h,
-                weather_condition  = EXCLUDED.weather_condition,
-                active_incidents   = EXCLUDED.active_incidents,
-                active_events      = EXCLUDED.active_events,
-                risk_score         = EXCLUDED.risk_score,
-                risk_level         = EXCLUDED.risk_level,
-                sample_count       = EXCLUDED.sample_count,
-                computed_at        = now()
-            """,
-            rows,
-        )
-        return cursor.rowcount
+    return execute_batched(
+        connection,
+        """
+        INSERT INTO zone_metrics
+            (zone_id, window_start, window_end, vehicle_count, average_speed_kph,
+             occupancy_ratio, congestion_level, aqi, aqi_category, temperature_c,
+             precipitation_mm_h, weather_condition, active_incidents, active_events,
+             risk_score, risk_level, sample_count, demo_data)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (zone_id, window_start, window_end) DO UPDATE SET
+            vehicle_count      = EXCLUDED.vehicle_count,
+            average_speed_kph  = EXCLUDED.average_speed_kph,
+            occupancy_ratio    = EXCLUDED.occupancy_ratio,
+            congestion_level   = EXCLUDED.congestion_level,
+            aqi                = EXCLUDED.aqi,
+            aqi_category       = EXCLUDED.aqi_category,
+            temperature_c      = EXCLUDED.temperature_c,
+            precipitation_mm_h = EXCLUDED.precipitation_mm_h,
+            weather_condition  = EXCLUDED.weather_condition,
+            active_incidents   = EXCLUDED.active_incidents,
+            active_events      = EXCLUDED.active_events,
+            risk_score         = EXCLUDED.risk_score,
+            risk_level         = EXCLUDED.risk_level,
+            sample_count       = EXCLUDED.sample_count,
+            computed_at        = now()
+        """,
+        rows,
+    )
 
 
 def write_quality_metrics(

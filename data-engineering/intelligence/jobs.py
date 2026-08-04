@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import psycopg
 from psycopg.rows import dict_row
 
+from common.db import execute_batched
 from generator.catalog import connect
 from intelligence.detection import (
     Baseline,
@@ -95,21 +96,20 @@ def learn_baselines(connection: psycopg.Connection, *, timezone_name: str = "Asi
             baseline.sample_count, learned_from, learned_to,
         ))
 
-    with connection.cursor() as cursor:
-        cursor.executemany("""
-            INSERT INTO zone_baselines (zone_id, metric, hour_of_week, median_value, mad,
-                p10, p90, sample_count, learned_from, learned_to)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (zone_id, metric, hour_of_week) DO UPDATE SET
-                median_value = EXCLUDED.median_value,
-                mad          = EXCLUDED.mad,
-                p10          = EXCLUDED.p10,
-                p90          = EXCLUDED.p90,
-                sample_count = EXCLUDED.sample_count,
-                learned_from = EXCLUDED.learned_from,
-                learned_to   = EXCLUDED.learned_to,
-                computed_at  = now()
-        """, payload)
+    execute_batched(connection, """
+        INSERT INTO zone_baselines (zone_id, metric, hour_of_week, median_value, mad,
+            p10, p90, sample_count, learned_from, learned_to)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (zone_id, metric, hour_of_week) DO UPDATE SET
+            median_value = EXCLUDED.median_value,
+            mad          = EXCLUDED.mad,
+            p10          = EXCLUDED.p10,
+            p90          = EXCLUDED.p90,
+            sample_count = EXCLUDED.sample_count,
+            learned_from = EXCLUDED.learned_from,
+            learned_to   = EXCLUDED.learned_to,
+            computed_at  = now()
+    """, payload)
     connection.commit()
     return len(payload)
 
@@ -189,14 +189,13 @@ def detect_anomalies(connection: psycopg.Connection, *, lookback: timedelta = DE
                 baseline.sample_count, outcome.explanation, row["demo_data"],
             ))
 
-    with connection.cursor() as cursor:
-        cursor.executemany("""
-            INSERT INTO anomalies (uid, zone_id, city_id, metric, anomaly_type, severity,
-                window_start, observed_value, baseline_value, baseline_mad,
-                deviation_score, percent_change, baseline_samples, explanation, demo_data)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (zone_id, metric, window_start) DO NOTHING
-        """, payload)
+    execute_batched(connection, """
+        INSERT INTO anomalies (uid, zone_id, city_id, metric, anomaly_type, severity,
+            window_start, observed_value, baseline_value, baseline_mad,
+            deviation_score, percent_change, baseline_samples, explanation, demo_data)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (zone_id, metric, window_start) DO NOTHING
+    """, payload)
     connection.commit()
     return len(payload), declined
 
@@ -316,16 +315,15 @@ def build_memory(connection: psycopg.Connection, *, timezone_name: str = "Asia/K
             ))
             last_recorded = moment
 
-    with connection.cursor() as cursor:
-        cursor.executemany("""
-            INSERT INTO situation_memory (uid, zone_id, city_id, occurred_at,
-                rain_band, day_type, hour_band, had_event, incident_band, congestion_band,
-                occupancy_at_start, speed_at_start, risk_at_start,
-                outcome_horizon_minutes, peak_occupancy, min_speed_kph, peak_risk,
-                occupancy_change_pct, speed_change_pct, risk_change_pct, demo_data)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (zone_id, occurred_at) DO NOTHING
-        """, payload)
+    execute_batched(connection, """
+        INSERT INTO situation_memory (uid, zone_id, city_id, occurred_at,
+            rain_band, day_type, hour_band, had_event, incident_band, congestion_band,
+            occupancy_at_start, speed_at_start, risk_at_start,
+            outcome_horizon_minutes, peak_occupancy, min_speed_kph, peak_risk,
+            occupancy_change_pct, speed_change_pct, risk_change_pct, demo_data)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (zone_id, occurred_at) DO NOTHING
+    """, payload)
     connection.commit()
     return len(payload)
 
@@ -444,22 +442,21 @@ def compute_correlations(connection: psycopg.Connection) -> int:
                 min(span[city_id]), max(span[city_id]),
             ))
 
-    with connection.cursor() as cursor:
-        cursor.executemany("""
-            INSERT INTO condition_correlations (city_id, condition_a, condition_b,
-                lift, support, confidence, windows_with_a, windows_with_both,
-                windows_total, computed_from, computed_to)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (city_id, condition_a, condition_b) DO UPDATE SET
-                lift = EXCLUDED.lift, support = EXCLUDED.support,
-                confidence = EXCLUDED.confidence,
-                windows_with_a = EXCLUDED.windows_with_a,
-                windows_with_both = EXCLUDED.windows_with_both,
-                windows_total = EXCLUDED.windows_total,
-                computed_from = EXCLUDED.computed_from,
-                computed_to = EXCLUDED.computed_to,
-                computed_at = now()
-        """, payload)
+    execute_batched(connection, """
+        INSERT INTO condition_correlations (city_id, condition_a, condition_b,
+            lift, support, confidence, windows_with_a, windows_with_both,
+            windows_total, computed_from, computed_to)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (city_id, condition_a, condition_b) DO UPDATE SET
+            lift = EXCLUDED.lift, support = EXCLUDED.support,
+            confidence = EXCLUDED.confidence,
+            windows_with_a = EXCLUDED.windows_with_a,
+            windows_with_both = EXCLUDED.windows_with_both,
+            windows_total = EXCLUDED.windows_total,
+            computed_from = EXCLUDED.computed_from,
+            computed_to = EXCLUDED.computed_to,
+            computed_at = now()
+    """, payload)
     connection.commit()
     return len(payload)
 

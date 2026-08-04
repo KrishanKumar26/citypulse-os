@@ -112,7 +112,12 @@ echo "==> Learning baselines, detecting anomalies, building memory"
 $PY -m intelligence.jobs all
 
 echo "==> Building the analytics marts"
-(cd dbt && DBT_PROFILES_DIR=. dbt build 2>&1 | tail -2)
+# dbt from the same interpreter as everything else. Taking it from PATH
+# fails on a virtualenv that has not been activated, which is exactly how
+# this script is normally invoked.
+DBT="$(dirname "$PY")/dbt"
+[ -x "$DBT" ] || DBT=dbt
+(cd dbt && DBT_PROFILES_DIR=. "$DBT" build 2>&1 | tail -2)
 
 echo
 echo "==> Loaded"

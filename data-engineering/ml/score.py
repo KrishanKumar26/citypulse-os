@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import psycopg
 from psycopg.rows import dict_row
 
+from common.db import execute_batched
 from generator.catalog import connect
 
 # Below this the actual is treated as effectively zero and percentage error is
@@ -91,7 +92,7 @@ def score_pending(connection: psycopg.Connection, *, limit: int) -> int:
             ))
 
         if rows:
-            cursor.executemany("""
+            execute_batched(connection, """
                 INSERT INTO forecast_accuracy (forecast_id, model_run_id, zone_id,
                     target_metric, horizon_minutes, target_time,
                     predicted_value, actual_value, absolute_error,

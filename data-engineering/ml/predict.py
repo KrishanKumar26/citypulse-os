@@ -28,6 +28,7 @@ import numpy as np
 import psycopg
 from psycopg.rows import dict_row
 
+from common.db import execute_batched
 from generator.catalog import connect
 from ml.features import FEATURE_NAMES, Observation, build_features
 from ml.model import RidgeModel, confidence_from_error, prediction_interval
@@ -269,8 +270,7 @@ def main(argv: list[str] | None = None) -> int:
                       f"(confidence {row[11]}, {row[12]})")
             return 0
 
-        with connection.cursor() as cursor:
-            cursor.executemany("""
+        execute_batched(connection, """
                 INSERT INTO forecasts (uid, zone_id, model_run_id, target_metric,
                     horizon_minutes, target_time, based_on_window, issued_at,
                     predicted_value, lower_bound, upper_bound, confidence,
