@@ -223,13 +223,16 @@ function HowItWorks() {
 }
 
 function Capabilities() {
+  // Labelled by what is built, not by which phase was meant to build it. An
+  // evaluator has two minutes (PRD §42) and needs to know what they can open
+  // right now — a phase number answers a different question.
   const capabilities = [
-    { title: "Live Intelligence", body: "Real-time zone conditions with traffic state, speed, crowd density, air quality and risk score.", phase: "Phase 4" },
-    { title: "Forecast Engine", body: "Congestion, speed, volume and risk predicted across 15 minutes to 6 hours, with measured confidence.", phase: "Phase 5" },
-    { title: "What-If Simulator", body: "Model weather, events, road closures and volume changes, then compare projected impact against the current baseline.", phase: "Phase 6" },
-    { title: "Anomaly Detection", body: "Continuous monitoring for traffic spikes, air quality excursions and data pipeline faults.", phase: "Phase 7" },
-    { title: "City Memory", body: "An index of past situations and their outcomes, so a recurring pattern is recognised as one.", phase: "Phase 7" },
-    { title: "API Platform", body: "Every capability available over a documented, key-authenticated, rate-limited REST API.", phase: "Phase 9" },
+    { title: "Live Intelligence", body: "Zone conditions streamed over server-sent events: traffic state, speed, air quality and composite risk, each citing the curated window it came from.", state: "Live" },
+    { title: "Forecast Engine", body: "Congestion, speed, volume and risk across 15 minutes to 6 hours. Confidence is computed from the model's error on held-out data, not asserted.", state: "Live" },
+    { title: "What-If Simulator", body: "Weather, events, closures and volume changes run against real observed conditions, with the engine's assumptions documented and unit tested.", state: "Live" },
+    { title: "Anomaly Detection", body: "Departures from what each zone normally does at this hour of the week — a learned baseline, not a fixed threshold.", state: "Live" },
+    { title: "City Memory", body: "Past situations and what actually followed them. When too few comparable situations exist, it says so rather than guessing.", state: "Live" },
+    { title: "API Platform", body: "Documented REST API with key authentication and rate limiting for third-party access.", state: "Planned" },
   ];
 
   return (
@@ -240,8 +243,8 @@ function Capabilities() {
           What the platform does.
         </h2>
         <p className="mt-3 max-w-2xl text-[15px] text-content-secondary">
-          Each capability is labelled with the phase that delivers it. Nothing below is presented
-          as available before it is built.
+          Each capability says whether it is built. Nothing below is presented as available
+          before it exists.
         </p>
 
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -249,8 +252,14 @@ function Capabilities() {
             <div key={capability.title} className="rounded-lg border border-line-subtle bg-surface-raised p-5">
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-[15px] font-medium">{capability.title}</h3>
-                <span className="shrink-0 rounded border border-line-default bg-surface-overlay px-2 py-0.5 text-[11px] text-content-tertiary">
-                  {capability.phase}
+                <span
+                  className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${
+                    capability.state === "Live"
+                      ? "border-status-normal/40 bg-status-normal/10 text-status-normal"
+                      : "border-line-default bg-surface-overlay text-content-tertiary"
+                  }`}
+                >
+                  {capability.state}
                 </span>
               </div>
               <p className="mt-2.5 text-[13px] leading-relaxed text-content-tertiary">{capability.body}</p>
@@ -340,15 +349,19 @@ function SecuritySection() {
 }
 
 function RoadmapSection() {
+  // Kept in step with docs/DEVELOPMENT_PLAN.md. A roadmap that still lists
+  // shipped work as planned is worse than no roadmap: it tells an evaluator the
+  // product does less than it does, and it is the first thing they read.
   const phases = [
     { phase: "Phase 0-1", title: "Architecture & backend foundation", status: "Complete" },
     { phase: "Phase 2", title: "Frontend foundation & command centre shell", status: "Complete" },
-    { phase: "Phase 3", title: "Data platform: Kafka, Spark, data lake", status: "Next" },
-    { phase: "Phase 4", title: "Live intelligence & real-time map", status: "Planned" },
-    { phase: "Phase 5", title: "Forecast engine", status: "Planned" },
-    { phase: "Phase 6", title: "What-if simulator", status: "Planned" },
-    { phase: "Phase 7", title: "Correlation, city memory & recommendations", status: "Planned" },
-    { phase: "Phase 8-9", title: "Cloud deployment, API platform & polish", status: "Planned" },
+    { phase: "Phase 3", title: "Data platform: Kafka, Spark, data lake", status: "Complete" },
+    { phase: "Phase 4", title: "Live intelligence & real-time map", status: "Complete" },
+    { phase: "Phase 5", title: "Forecast engine", status: "Complete" },
+    { phase: "Phase 6", title: "What-if simulator", status: "Complete" },
+    { phase: "Phase 7", title: "Anomalies, city memory & correlation", status: "Complete" },
+    { phase: "Phase 8", title: "CI/CD, container builds & hardening", status: "Next" },
+    { phase: "Phase 9", title: "Cloud deployment, API platform & polish", status: "Planned" },
   ];
 
   return (
@@ -360,6 +373,8 @@ function RoadmapSection() {
         </h2>
         <p className="mt-3 max-w-2xl text-[15px] text-content-secondary">
           The application builds, boots and passes its test suite at the end of every phase.
+          Currently 543 automated checks across the backend, data platform, dbt models and
+          frontend.
         </p>
 
         <div className="mt-10 space-y-px overflow-hidden rounded-lg border border-line-subtle bg-line-subtle">
