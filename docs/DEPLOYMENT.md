@@ -293,8 +293,16 @@ committing. Flyway rolled the whole migration back cleanly, so nothing was left
 half-applied, but the schema simply never arrived. The direct endpoint applied
 the same migration without complaint.
 
-Use the pooled endpoint for the running application, where short transactions
-are exactly what a pooler is good at.
+**Use the direct endpoint for the backend too**, not the pooled one, even though
+a pooler is exactly right for the short transactions the application issues. The
+backend runs Flyway on boot, so every deploy that carries a new migration would
+attempt that DDL through PgBouncer and hit the same reset — turning a routine
+deploy into a failed one at the worst possible moment.
+
+Nothing is lost by it here. The free tier runs one instance, and HikariCP
+already pools connections inside it; PgBouncer earns its place when many
+instances share a database, which is not this. Revisit it if the backend is ever
+scaled out, and move migrations to a separate step before doing so.
 
 **2. Backend.** On Render, create a Blueprint from this repository — it reads
 `render.yaml`. Set the variables marked `sync: false`:

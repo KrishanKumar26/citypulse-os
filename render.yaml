@@ -8,9 +8,12 @@
 # Render's free tier is genuinely free and needs no card, but it has one
 # behaviour that shapes everything below: a free web service is stopped after
 # 15 minutes without traffic, and the next request waits for it to start again.
-# For a JVM that is roughly a minute. The keep-warm workflow in
-# .github/workflows/keep-warm.yml exists because of this, and the limitation is
-# documented in docs/DEPLOYMENT.md rather than hidden.
+# For a JVM that is roughly a minute.
+#
+# There is deliberately no keep-warm workflow. Pinging every ten minutes would
+# consume more than the whole free Actions allowance on nothing but pings, so
+# the cold start is documented in docs/DEPLOYMENT.md §9 and left in place. An
+# external uptime monitor does the same job without spending the allowance.
 #
 # The database is deliberately *not* declared here. Render's free PostgreSQL is
 # deleted after 90 days; Neon's free tier is not, and losing the database on a
