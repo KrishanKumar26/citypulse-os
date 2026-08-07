@@ -52,10 +52,19 @@ services:
         generateValue: true
 
       # --- Application ----------------------------------------------------
+      # The deployed frontend. Committed rather than left to the dashboard,
+      # because a public URL is not a credential and the browser silently
+      # blocks every request when this is wrong — a dashboard that loads and
+      # then shows nothing, with no error anywhere the user can see. It is
+      # worth having in the file that describes the deployment.
+      #
+      # A preview branch on Vercel gets its own hostname and would be blocked
+      # by this. That is the correct default: an origin is allowed because it
+      # was named, not because it happens to be on vercel.app.
       - key: CITYPULSE_FRONTEND_URL
-        sync: false     # The Vercel URL, known only after the frontend deploys.
+        value: https://citypulse-os-two.vercel.app
       - key: CITYPULSE_CORS_ORIGINS
-        sync: false
+        value: https://citypulse-os-two.vercel.app
       - key: CITYPULSE_LOG_LEVEL
         value: INFO
 
