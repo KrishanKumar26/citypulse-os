@@ -2,8 +2,23 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Traces the exact dependency set the server needs, so the runtime image can
-  // ship without a node_modules tree. Required by the multi-stage Dockerfile.
-  output: "standalone",
+  // ship without a node_modules tree. Required by the multi-stage Dockerfile,
+  // which copies .next/standalone and nothing else.
+  //
+  // Not on Vercel, which builds its own serverless output and needs the default
+  // one. Given `standalone` it compiled the whole application, generated all 18
+  // pages, and then died on the very last step:
+  //
+  //     Running onBuildComplete from Vercel
+  //     Error: ENOENT ... .next/next-server.js.nft.json
+  //
+  // Before that failure was visible it was worse: an earlier deployment
+  // returned the landing page and 404 for every other route — a build reported
+  // successful and a site that did not work.
+  //
+  // VERCEL is set by Vercel's build environment, so Docker and local builds are
+  // untouched.
+  output: process.env.VERCEL ? undefined : "standalone",
 
   // The build must not succeed with type errors — CI would then report green on
   // code that does not actually compile cleanly.
