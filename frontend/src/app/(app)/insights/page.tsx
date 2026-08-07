@@ -3,7 +3,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { Badge, Card, CardHeader, EmptyState, ErrorState, LoadingState } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  cn,
+} from "@/components/ui";
+import { LiftChart } from "@/components/charts/LiftChart";
 import { intelligenceApi } from "@/lib/api/endpoints";
 import type {
   AlertSeverity,
@@ -197,6 +206,18 @@ function CurrentSituation({ recall, loading }: { recall: MemoryRecall | null; lo
   );
 }
 
+/**
+ * A median outcome, drawn from the point where nothing changed.
+ *
+ * Three bare percentages left the reader to work out whether "+8.2%" was a lot,
+ * and in which direction it mattered. The bar grows from a centre line at zero,
+ * so the sign and the size are read together and a change of nothing is visibly
+ * nothing rather than a number that happens to be small.
+ *
+ * `inverse` exists because the same direction means opposite things: rising
+ * congestion and risk are bad, rising speed is good. Colouring by sign alone
+ * would paint a recovering city red.
+ */
 function Delta({
   label,
   value,
@@ -207,18 +228,47 @@ function Delta({
   inverse?: boolean;
 }) {
   const n = value === null ? null : Number(value);
-  // For congestion and risk, up is bad; for speed, up is good.
   const good = n === null ? null : inverse ? n < 0 : n > 0;
+
+  // Clamped at 40%. A single extreme median would otherwise flatten the other
+  // two into the axis, and the comparison between them is the point.
+  const SPAN = 40;
+  const magnitude = n === null ? 0 : Math.min(Math.abs(n), SPAN) / SPAN;
 
   return (
     <div className="bg-surface-raised px-3 py-2.5">
-      <div className="text-[11px] text-content-tertiary">{label}</div>
-      <div
-        className={`mt-0.5 text-[15px] font-medium tabular ${
-          good === null ? "" : good ? "text-status-normal" : "text-status-high"
-        }`}
-      >
-        {n === null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`}
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10.5px] text-content-tertiary">{label}</span>
+        <span
+          className={cn(
+            "tabular text-[15px] font-medium leading-none",
+            good === null
+              ? "text-content-disabled"
+              : good
+                ? "text-status-normal"
+                : "text-status-high",
+          )}
+        >
+          {n === null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(1)}%`}
+        </span>
+      </div>
+
+      <div className="relative mt-2 h-1.5 rounded-full bg-surface-hover">
+        <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-px bg-line-strong" />
+        {n !== null && (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute inset-y-0 rounded-full transition-[width]",
+              good ? "bg-status-normal" : "bg-status-high",
+            )}
+            style={
+              n >= 0
+                ? { left: "50%", width: `${magnitude * 50}%` }
+                : { right: "50%", width: `${magnitude * 50}%` }
+            }
+          />
+        )}
       </div>
     </div>
   );
@@ -303,25 +353,13 @@ function CorrelationsPanel({
           description="Run the intelligence jobs: python -m intelligence.jobs correlations"
         />
       ) : (
-        <ul className="divide-y divide-line-subtle">
-          {correlations.map((c) => (
-            <li key={`${c.conditionA}-${c.conditionB}`} className="px-5 py-3">
-              <div className="flex items-start justify-between gap-4">
-                <p className="text-[13px] leading-relaxed text-content-secondary">{c.statement}</p>
-                <span className="shrink-0 text-[13px] tabular font-medium text-content-primary">
-                  {Number(c.lift).toFixed(1)}×
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
+        // Plotted against 1, where lift means nothing. The list this replaces
+        // printed "4.4x, 1.9x, 1.1x" with the reference point nowhere on the
+        // page, so a reader had to hold it in their head to tell a finding from
+        // noise — and support was absent entirely, which is what separates a
+        // strong claim from a rare coincidence.
+        <LiftChart correlations={correlations} />
       )}
-      <p className="border-t border-line-subtle px-5 py-3 text-[11px] leading-relaxed text-content-tertiary">
-        Lift is how much more often two conditions appear together than chance would give. It
-        measures association, not cause: rain and congestion rise together partly because both are
-        heavier at the same times of day, and nothing here separates that from rain making traffic
-        worse.
-      </p>
     </Card>
   );
 }
