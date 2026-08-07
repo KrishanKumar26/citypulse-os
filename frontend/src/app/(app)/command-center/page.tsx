@@ -24,6 +24,7 @@ import type { ConditionLevel, Zone, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
 import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
 import { KpiRow } from "@/components/live/KpiRow";
+import { RiskDistribution, ZoneRiskChart } from "@/components/charts/ZoneRiskChart";
 import { LiveStatusBar } from "@/components/live/LiveStatusBar";
 import { formatArea, formatNumber } from "@/lib/format";
 
@@ -141,6 +142,36 @@ export default function CommandCenterPage() {
         </Card>
 
         <div className="space-y-5">
+          {/*
+            Ranked risk, above the detail panel.
+            The right column previously held only "No zone selected" until
+            someone clicked the map — a third of the width saying nothing on
+            arrival. The one question a reader lands with is which zones are
+            worst, and the map answers it only by comparing dot colours across a
+            city they may not know.
+          */}
+          <Card className="overflow-hidden">
+            <CardHeader
+              title="Risk by zone"
+              description="Composite risk on a fixed 0–100 scale, worst first."
+            />
+            {snapshot ? (
+              <>
+                <RiskDistribution zones={snapshot.zones} />
+                <ZoneRiskChart
+                  zones={snapshot.zones}
+                  selectedZoneId={selectedZone?.id ?? null}
+                  onSelectZone={(zoneId) => {
+                    const zone = zones.find((z) => z.id === zoneId);
+                    if (zone) setSelectedZone(zone);
+                  }}
+                />
+              </>
+            ) : (
+              <div className="skeleton m-5 h-48" />
+            )}
+          </Card>
+
           <ZoneDetailPanel
             zone={selectedZone}
             condition={selectedZone ? conditions.get(selectedZone.id) : undefined}
