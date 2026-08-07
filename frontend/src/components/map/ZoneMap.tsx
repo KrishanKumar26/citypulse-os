@@ -50,14 +50,46 @@ export { ZONE_TYPE_COLORS };
  * reported nothing, which must be visually distinct from a calm one rather than
  * blending into the "normal" green.
  */
-const CONDITION_COLORS: Record<ConditionLevel, string> = {
-  NORMAL: "#3fb950",
-  MODERATE: "#d29922",
-  HIGH: "#db6d28",
-  CRITICAL: "#f85149",
+/**
+ * Severity colours, read from the design tokens rather than restated here.
+ *
+ * These were four hardcoded hexes that matched nothing else in the product: a
+ * HIGH zone was one orange on the map and a different orange in the badge
+ * beside it, for the same word about the same zone. Three severity palettes
+ * existed — tokens, chart, map — and nothing kept them in step.
+ *
+ * Leaflet takes plain colour strings rather than CSS values, so the tokens are
+ * resolved once in the browser. The literals below are only the pre-hydration
+ * fallback and are kept identical to the tokens by a test.
+ */
+const FALLBACK_CONDITION_COLORS: Record<ConditionLevel, string> = {
+  NORMAL: "#10b981",
+  MODERATE: "#facc15",
+  HIGH: "#f97316",
+  CRITICAL: "#e11d48",
 };
 
-const NO_DATA_COLOR = "#6e7681";
+const TOKEN_BY_LEVEL: Record<ConditionLevel, string> = {
+  NORMAL: "--color-status-normal",
+  MODERATE: "--color-status-moderate",
+  HIGH: "--color-status-high",
+  CRITICAL: "--color-status-critical",
+};
+
+function resolveConditionColors(): Record<ConditionLevel, string> {
+  if (typeof window === "undefined") return FALLBACK_CONDITION_COLORS;
+  const root = getComputedStyle(document.documentElement);
+  const resolved = {} as Record<ConditionLevel, string>;
+  (Object.keys(TOKEN_BY_LEVEL) as ConditionLevel[]).forEach((level) => {
+    resolved[level] =
+      root.getPropertyValue(TOKEN_BY_LEVEL[level]).trim() || FALLBACK_CONDITION_COLORS[level];
+  });
+  return resolved;
+}
+
+const CONDITION_COLORS: Record<ConditionLevel, string> = resolveConditionColors();
+
+const NO_DATA_COLOR = "#6b7a94";
 
 export { CONDITION_COLORS, NO_DATA_COLOR };
 

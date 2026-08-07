@@ -21,53 +21,80 @@
  * job the PRD asks for, which is hierarchy a reader can see at a glance.
  */
 @theme {
-  /* Surfaces — lowest to highest elevation.
-     Lifted off pure black and given a slight blue cast, so elevation is
-     visible as a step rather than only as a hairline border. */
-  --color-surface-base: #0a0c12;
-  --color-surface-raised: #11141c;
-  --color-surface-overlay: #171b25;
-  --color-surface-hover: #1e2330;
-  --color-surface-inset: #0d1016;
+  /* Surfaces — deep charcoal-navy, lowest to highest elevation. Each step is a
+     visible change in ground, so depth does not rest on a hairline border. */
+  --color-surface-base: #080b14;
+  --color-surface-raised: #0f1420;
+  --color-surface-overlay: #161d2c;
+  --color-surface-hover: #1e2637;
+  --color-surface-inset: #0b0f19;
 
   /* Borders */
-  --color-line-subtle: #1f242f;
-  --color-line-default: #2a3040;
-  --color-line-strong: #3b4356;
+  --color-line-subtle: #1c2537;
+  --color-line-default: #283246;
+  --color-line-strong: #3a465e;
 
-  /* Elevation. A card is separated from its ground by depth as well as by a
-     line — one hairline on a near-black field is not a visible step. */
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px -6px rgb(0 0 0 / 0.5);
-  --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.45), 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  /* Elevation. A card is separated from its ground by depth as well as a line. */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 4px 16px -6px rgb(0 0 0 / 0.55);
+  --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.65);
+  --shadow-drawer: -8px 0 32px -12px rgb(0 0 0 / 0.7);
 
   /* Text — the ramp carries hierarchy, so most text is not pure white */
-  --color-content-primary: #f2f4f8;
-  --color-content-secondary: #a8b0c0;
-  --color-content-tertiary: #6b7488;
-  --color-content-disabled: #454c5c;
+  --color-content-primary: #f1f5f9;
+  --color-content-secondary: #a3b0c4;
+  --color-content-tertiary: #6b7a94;
+  --color-content-disabled: #47546b;
 
-  /* Accent */
-  --color-accent: #3d7dff;
-  --color-accent-hover: #5590ff;
-  --color-accent-muted: #1a2f5c;
-  --color-accent-subtle: #101c33;
+  /* Accent — electric cyan. Interface chrome: active navigation, focus rings,
+     primary actions, and the live indicator. */
+  --color-accent: #22d3ee;
+  --color-accent-hover: #4be0f5;
+  --color-accent-muted: #10485a;
+  --color-accent-subtle: #0b2a36;
+  /* The step used for cyan *chart marks*. Darker than the interface accent
+     because a mark must sit in the dark lightness band to stay separable from
+     its neighbours; interface chrome has no neighbour to be confused with. */
+  --color-accent-mark: #0ca5c2;
+
+  /* Prediction and inference — fuchsia, reserved.
+     Chosen by measurement, not taste: the violet the brief suggested sits ΔE 5.2
+     from the cyan under deuteranopia, so "live" and "AI" markers would have been
+     the same colour to a colour-blind reader. Fuchsia measures 10.0 under the
+     same simulation and 32.0 in normal vision. Never used for a series or a
+     status — it means "this number was inferred, not observed". */
+  --color-ai: #c026d3;
+  --color-ai-hover: #d64ae2;
+  --color-ai-muted: #3d0d43;
+  --color-ai-subtle: #240628;
 
   /*
    * Status scale, used for both alerts and the four city-condition states in
    * PRD §9 (Normal / Moderate / High / Critical). One scale for both keeps a
    * given colour meaning exactly one level of concern anywhere in the product.
+   *
+   * These steps were selected by running the palette validator against this
+   * surface rather than picked by eye. The previous set put Elevated and High
+   * ΔE 10.2 apart in normal vision, against a floor of 15 — two severities a
+   * reader could not reliably tell apart, on the map as well as in a chart.
+   * This set measures 16.3 at its worst adjacent pair and 13.3 under
+   * deuteranopia.
+   *
+   * Even so, severity is never left to colour: four steps spanning green to red
+   * cannot clear the floor at *any* choice of hues, because orange sits between
+   * amber and red by construction. Every use pairs the colour with a written
+   * level.
    */
-  --color-status-normal: #2fb37a;
-  --color-status-normal-bg: #0d2119;
-  --color-status-moderate: #d9a227;
-  --color-status-moderate-bg: #241c08;
-  --color-status-high: #e07a3c;
-  --color-status-high-bg: #26160a;
-  --color-status-critical: #e5484d;
-  --color-status-critical-bg: #2a1113;
+  --color-status-normal: #10b981;
+  --color-status-normal-bg: #072b21;
+  --color-status-moderate: #facc15;
+  --color-status-moderate-bg: #2b2408;
+  --color-status-high: #f97316;
+  --color-status-high-bg: #2e1a08;
+  --color-status-critical: #e11d48;
+  --color-status-critical-bg: #2e0a17;
 
-  --color-info: #4a9eda;
-  --color-info-bg: #0c1c28;
+  --color-info: #38bdf8;
+  --color-info-bg: #0a2233;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
@@ -75,7 +102,9 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
+  --radius-xl: 14px;
 }
+
 
 @layer base {
   html {
