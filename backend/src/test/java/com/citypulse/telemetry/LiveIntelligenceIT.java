@@ -415,6 +415,42 @@ class LiveIntelligenceIT extends IntegrationTest {
         }
 
         @Test
+        @DisplayName("widens the bucket rather than truncating a long range")
+        void longRangeIsBucketedNotCut() throws Exception {
+            Tokens tokens = loginAs("history-bucket@example.com", RoleName.CITY_OPERATOR);
+
+            JsonNode body = objectMapper.readTree(mockMvc.perform(get("/api/v1/live/by-slug/bengaluru/history")
+                            .param("from", Instant.now().minus(30, ChronoUnit.DAYS).toString())
+                            .param("to", Instant.now().toString())
+                            .header("Authorization", "Bearer " + tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+
+            // Thirty days of five-minute windows is 8,640 against a 500 cap.
+            // Returning the first 500 would answer "the last month" with its
+            // first 42 hours, and nothing in the chart would say so.
+            int bucket = body.path("data").path("bucketMinutes").asInt();
+            assertThat(bucket).isGreaterThan(5);
+            assertThat(body.path("data").path("windows").asInt()).isLessThanOrEqualTo(500);
+        }
+
+        @Test
+        @DisplayName("keeps the curated width for a short range")
+        void shortRangeStaysAtWindowWidth() throws Exception {
+            Tokens tokens = loginAs("history-fine@example.com", RoleName.CITY_OPERATOR);
+
+            JsonNode body = objectMapper.readTree(mockMvc.perform(get("/api/v1/live/by-slug/bengaluru/history")
+                            .param("from", Instant.now().minus(6, ChronoUnit.HOURS).toString())
+                            .param("to", Instant.now().toString())
+                            .header("Authorization", "Bearer " + tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+
+            // Six hours is 72 windows; there is no reason to coarsen it.
+            assertThat(body.path("data").path("bucketMinutes").asInt()).isEqualTo(5);
+        }
+
+        @Test
         @DisplayName("rejects a range that ends before it starts")
         void rejectsInvertedRange() throws Exception {
             Tokens tokens = loginAs("history-range@example.com", RoleName.CITY_OPERATOR);

@@ -241,6 +241,10 @@ export interface CityHistory {
   from: string;
   to: string;
   windows: number;
+  /** Width of each point. Wider than the curated window on long ranges, so the
+      whole range is covered rather than its first 500 windows returned as if
+      they were all of it. */
+  bucketMinutes: number;
   zonesMonitored: number;
   points: CityHistoryPoint[];
 }

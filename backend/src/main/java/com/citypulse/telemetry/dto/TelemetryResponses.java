@@ -104,6 +104,12 @@ public final class TelemetryResponses {
             Instant from,
             Instant to,
             int windows,
+
+            @Schema(description = "Width of each returned point in minutes. Wider than the "
+                    + "curated window when the range is long enough that returning every "
+                    + "window would exceed the cap — stated so a caller can label its axis "
+                    + "for what it actually received rather than for what it asked for.")
+            int bucketMinutes,
             @Schema(description = "Zones monitored in this city, for reading the coverage of each window")
             int zonesMonitored,
             List<CityHistoryPoint> points

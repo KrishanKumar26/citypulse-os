@@ -53,7 +53,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
   {
     heading: "Analytics",
     items: [
-      { label: "City Analytics", href: "/analytics", icon: "chart", available: false },
+      { label: "City Analytics", href: "/analytics", icon: "chart", available: true },
     ],
   },
   {

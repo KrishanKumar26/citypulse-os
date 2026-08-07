@@ -107,6 +107,45 @@ public interface ZoneMetricRepository extends JpaRepository<ZoneMetric, Long> {
                                         @Param("to") Instant to,
                                         Pageable pageable);
 
+    /**
+     * The same aggregate, folded into fixed-width buckets.
+     *
+     * <p>Curated windows are five minutes wide, so a month is 8,640 of them
+     * against a 500-window cap. Returning the first 500 would have answered "the
+     * last 30 days" with the first 42 hours of it, labelled as a month — a
+     * silent truncation, which is worse than a refusal because nothing about the
+     * chart would look wrong.
+     *
+     * <p>Native rather than JPQL: bucketing needs epoch arithmetic that JPQL has
+     * no way to express. The averages are of the per-zone rows in the bucket,
+     * which is the mean over zone-windows rather than a mean of window means —
+     * they differ only when zones report unevenly, and the zone-window mean is
+     * the one that weights an hour by how much was actually measured in it.
+     */
+    @Query(value = """
+            SELECT to_timestamp(floor(extract(epoch FROM window_start) / :seconds) * :seconds)
+                                              AS window_start,
+                   AVG(occupancy_ratio)       AS occupancy_ratio,
+                   AVG(average_speed_kph)     AS average_speed_kph,
+                   AVG(aqi)                   AS aqi,
+                   AVG(risk_score)            AS risk_score,
+                   SUM(vehicle_count)         AS vehicle_count,
+                   SUM(active_incidents)      AS active_incidents,
+                   COUNT(DISTINCT zone_id)    AS reporting_zones
+            FROM zone_metrics
+            WHERE zone_id IN :zoneIds
+              AND window_start >= :from
+              AND window_start < :to
+            GROUP BY 1
+            ORDER BY 1 ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<CityHistoryRow> findCityBuckets(@Param("zoneIds") List<Long> zoneIds,
+                                         @Param("from") Instant from,
+                                         @Param("to") Instant to,
+                                         @Param("seconds") long seconds,
+                                         @Param("limit") int limit);
+
     /** Projection for {@link #findCityWindow}. */
     interface CityHistoryRow {
         Instant getWindowStart();

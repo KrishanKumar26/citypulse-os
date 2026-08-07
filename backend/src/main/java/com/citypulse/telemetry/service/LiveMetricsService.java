@@ -340,13 +340,15 @@ public class LiveMetricsService {
         List<Zone> zones = zoneRepository.findByCity(city.getId(), true);
         if (zones.isEmpty()) {
             return new TelemetryResponses.CityHistory(
-                    city.getUid().toString(), city.getSlug(), start, end, 0, 0, List.of());
+                    city.getUid().toString(), city.getSlug(), start, end, 0,
+                    CURATED_WINDOW_MINUTES, 0, List.of());
         }
 
         List<Long> zoneIds = zones.stream().map(Zone::getId).toList();
+        int bucketMinutes = bucketFor(start, end, properties.maxHistoryWindows());
         List<TelemetryResponses.CityHistoryPoint> points = metricRepository
-                .findCityWindow(zoneIds, start, end,
-                        PageRequest.of(0, properties.maxHistoryWindows()))
+                .findCityBuckets(zoneIds, start, end,
+                        bucketMinutes * 60L, properties.maxHistoryWindows())
                 .stream()
                 .map(row -> new TelemetryResponses.CityHistoryPoint(
                         row.getWindowStart(),
@@ -363,7 +365,34 @@ public class LiveMetricsService {
 
         return new TelemetryResponses.CityHistory(
                 city.getUid().toString(), city.getSlug(), start, end,
-                points.size(), zones.size(), points);
+                points.size(), bucketMinutes, zones.size(), points);
+    }
+
+    /** Curated windows are five minutes wide; see the Spark job's tumbling window. */
+    private static final int CURATED_WINDOW_MINUTES = 5;
+
+    /**
+     * The narrowest bucket that fits the requested range inside the cap.
+     *
+     * <p>A month at the curated width is 8,640 points against a 500-point limit.
+     * Returning the first 500 would answer "the last 30 days" with the first 42
+     * hours of it, labelled as a month — a truncation nothing about the chart
+     * would reveal. Widening the bucket instead keeps the whole range and says
+     * in the response how wide each point is, so the caller can label its axis
+     * for what it received.
+     *
+     * <p>The steps are ordinary reporting intervals rather than whatever
+     * arithmetic produces, because an axis ticked every 23 minutes is not one
+     * anybody reads.
+     */
+    static int bucketFor(Instant from, Instant to, int maxPoints) {
+        long minutes = java.time.Duration.between(from, to).toMinutes();
+        for (int bucket : new int[]{CURATED_WINDOW_MINUTES, 15, 30, 60, 180, 360, 720, 1440}) {
+            if (minutes / bucket <= maxPoints) {
+                return bucket;
+            }
+        }
+        return 1440;
     }
 
     /** Rounds an aggregate to the precision the column is stored at. */
