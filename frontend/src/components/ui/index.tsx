@@ -137,7 +137,14 @@ export function Card({
   as?: "div" | "section" | "article";
 }) {
   return (
-    <Tag className={cn("rounded-lg border border-line-subtle bg-surface-raised", className)}>
+    // Elevation as well as a border. On a near-black field a single hairline is
+    // not a visible step, so every card read as flat regardless of what it held.
+    <Tag
+      className={cn(
+        "rounded-lg border border-line-subtle bg-surface-raised shadow-[var(--shadow-card)]",
+        className,
+      )}
+    >
       {children}
     </Tag>
   );

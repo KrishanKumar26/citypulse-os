@@ -3,25 +3,42 @@
 /*
  * CityPulse OS design tokens (PRD §32).
  *
- * Dark, premium, minimal, enterprise-grade. The palette is deliberately narrow:
- * a near-black surface ramp, one accent, and a semantic status scale. Anything
- * outside these tokens should not appear in a component.
+ * Dark, premium, modern, minimal, enterprise-grade. Anything outside these
+ * tokens should not appear in a component.
  *
- * Explicitly avoided, per the PRD: heavy gradients, glow effects, cyberpunk
- * styling, and decorative animation. Emphasis comes from spacing, weight, and
- * hierarchy rather than colour.
+ * The PRD rules out *excessive* gradients and *excessive* glow, cyberpunk
+ * styling, unnecessary animation and large decorative elements. It does not
+ * rule out colour, and its actual bar is that the product "must look credible
+ * as a commercial product". An earlier reading of this file hardened those
+ * limits into a near-monochrome palette where emphasis came from spacing alone,
+ * and the result read as a settings page rather than an operations console —
+ * failing the requirement it was trying to honour.
+ *
+ * So: surfaces are lifted off pure black and carry a slight blue cast, because
+ * #08090c reads as absence of design rather than as a choice. Elevation is a
+ * token rather than a border alone. Severity tints a card's ground when the
+ * card *is* about severity. None of that is decoration — each one is doing the
+ * job the PRD asks for, which is hierarchy a reader can see at a glance.
  */
 @theme {
-  /* Surfaces — lowest to highest elevation */
-  --color-surface-base: #08090c;
-  --color-surface-raised: #0e1015;
-  --color-surface-overlay: #14171e;
-  --color-surface-hover: #1a1e27;
+  /* Surfaces — lowest to highest elevation.
+     Lifted off pure black and given a slight blue cast, so elevation is
+     visible as a step rather than only as a hairline border. */
+  --color-surface-base: #0a0c12;
+  --color-surface-raised: #11141c;
+  --color-surface-overlay: #171b25;
+  --color-surface-hover: #1e2330;
+  --color-surface-inset: #0d1016;
 
   /* Borders */
-  --color-line-subtle: #1c202a;
-  --color-line-default: #262b37;
-  --color-line-strong: #363d4d;
+  --color-line-subtle: #1f242f;
+  --color-line-default: #2a3040;
+  --color-line-strong: #3b4356;
+
+  /* Elevation. A card is separated from its ground by depth as well as by a
+     line — one hairline on a near-black field is not a visible step. */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px -6px rgb(0 0 0 / 0.5);
+  --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.45), 0 12px 32px -12px rgb(0 0 0 / 0.6);
 
   /* Text — the ramp carries hierarchy, so most text is not pure white */
   --color-content-primary: #f2f4f8;

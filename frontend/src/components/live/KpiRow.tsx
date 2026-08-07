@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Metric, Skeleton } from "@/components/ui";
+import { Badge, Metric, Skeleton, cn } from "@/components/ui";
 import type { CityKpis, ConditionLevel } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 
@@ -29,6 +29,23 @@ const RISK_WORD: Record<ConditionLevel, string> = {
   HIGH: "High",
   CRITICAL: "Critical",
 };
+
+// Ground and edge per severity. The tints are the existing status-*-bg tokens,
+// so this card cannot drift away from the badge, map marker and alert row that
+// describe the same level.
+const RISK_CARD = {
+  normal: "border-status-normal/25 bg-status-normal-bg",
+  moderate: "border-status-moderate/25 bg-status-moderate-bg",
+  high: "border-status-high/25 bg-status-high-bg",
+  critical: "border-status-critical/30 bg-status-critical-bg",
+} as const;
+
+const RISK_EDGE = {
+  normal: "bg-status-normal",
+  moderate: "bg-status-moderate",
+  high: "bg-status-high",
+  critical: "bg-status-critical",
+} as const;
 
 const LEVEL_TO_STATUS = {
   NORMAL: "normal",
@@ -114,8 +131,28 @@ export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: bool
 
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
-      {/* Composite risk, given the weight of a headline rather than a tile. */}
-      <div className="flex flex-col justify-between rounded-lg border border-line-subtle bg-surface-raised px-5 py-4">
+      {/*
+        Composite risk, given the weight of a headline rather than a tile.
+
+        The card takes the colour of the level it is reporting — ground tint and
+        a solid edge, not just a coloured numeral. This is the one place on the
+        page where the surface itself should carry meaning: a critical city and a
+        calm one should be distinguishable across a room, before any number is
+        read. Everywhere else the ground stays neutral, so this stays a signal
+        rather than becoming wallpaper.
+      */}
+      <div
+        className={cn(
+          "relative flex flex-col justify-between overflow-hidden rounded-lg border px-5 py-4 shadow-[var(--shadow-card)] transition-colors",
+          riskStatus ? RISK_CARD[riskStatus] : "border-line-subtle bg-surface-raised",
+        )}
+      >
+        {riskStatus && (
+          <span
+            aria-hidden="true"
+            className={cn("absolute inset-y-0 left-0 w-[3px]", RISK_EDGE[riskStatus])}
+          />
+        )}
         {loading ? (
           <Skeleton className="h-14 w-32" />
         ) : (
