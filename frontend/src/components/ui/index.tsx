@@ -151,7 +151,10 @@ export function Card({
     // not a visible step, so every card read as flat regardless of what it held.
     <Tag
       className={cn(
-        "rounded-lg border border-line-subtle bg-surface-raised shadow-[var(--shadow-card)]",
+        // surface-raised-edge, not a bare shadow: a fill plus a hairline gives an
+        // edge but no form. The inset highlight along the top is what makes a
+        // panel read as lifted off the page rather than drawn on it.
+        "rounded-lg border border-line-subtle bg-surface-raised surface-raised-edge",
         className,
       )}
     >
@@ -166,12 +169,19 @@ export function CardHeader({ title, description, action }: {
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-line-subtle px-5 py-4">
-      <div>
-        <h2 className="text-sm font-semibold text-content-primary">{title}</h2>
-        {description && <p className="mt-0.5 text-[13px] text-content-tertiary">{description}</p>}
+    // Title and description were 14px and 13px — near enough that a card had no
+    // internal hierarchy and the eye had nowhere to land. The gap is now wide
+    // enough to be a hierarchy rather than a rounding difference.
+    <div className="flex items-start justify-between gap-4 border-b border-line-subtle px-5 py-3.5">
+      <div className="min-w-0">
+        <h2 className="text-[15px] font-semibold leading-tight tracking-[-0.01em] text-content-primary">
+          {title}
+        </h2>
+        {description && (
+          <p className="mt-1 text-[11.5px] leading-relaxed text-content-tertiary">{description}</p>
+        )}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
@@ -369,10 +379,13 @@ export function Metric({
 
   return (
     <div className={cn("flex flex-col", hero ? "gap-1.5" : "gap-1")}>
+      {/* Labels recede so the value does not have to shout. The ratio between
+          them is the hierarchy — making the number bigger while the label keeps
+          pace changes nothing. */}
       <span
         className={cn(
-          "font-medium uppercase tracking-[0.08em] text-content-tertiary",
-          hero ? "text-[11px]" : "text-[10px]",
+          "font-medium uppercase tracking-[0.09em] text-content-tertiary",
+          hero ? "text-[10.5px]" : "text-[9.5px]",
         )}
       >
         {label}
@@ -387,7 +400,7 @@ export function Metric({
           <span
             className={cn(
               "tabular font-semibold tracking-tight",
-              hero ? "text-[38px] leading-none" : "text-[22px] leading-none",
+              hero ? "text-[44px] leading-none" : "text-[27px] leading-none",
               level ? METRIC_TEXT[level] : "text-content-primary",
             )}
           >

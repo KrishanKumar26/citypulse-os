@@ -192,7 +192,11 @@ export function KpiRow({
       <div className="grid gap-px overflow-hidden rounded-lg border border-line-subtle bg-line-subtle sm:grid-cols-2 xl:grid-cols-3">
         {groups.map((group) => (
           <section key={group.heading} className="bg-surface-raised px-5 py-4">
-            <h3 className="mb-3 text-[10px] font-medium uppercase tracking-[0.1em] text-content-disabled">
+            {/* A cyan tick beside each group. The accent existed only on the
+                active nav item, so nothing on the page carried the product's
+                colour — every section read as the same anonymous panel. */}
+            <h3 className="mb-3 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.1em] text-content-tertiary">
+              <span aria-hidden="true" className="h-3 w-[2px] rounded-full bg-accent/60" />
               {group.heading}
             </h3>
             <div className="grid gap-4">
