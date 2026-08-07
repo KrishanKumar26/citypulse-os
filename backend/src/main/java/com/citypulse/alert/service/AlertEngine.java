@@ -61,9 +61,24 @@ public class AlertEngine {
      *
      * <p>Not annotated {@code @Transactional}: each zone commits on its own so a
      * failure on one does not roll back alerts correctly raised for the others.
+     *
+     * <p>The initial delay is its own property, defaulting to the stream interval
+     * so production behaviour is unchanged.
+     *
+     * <p>It exists so integration tests can push the first firing beyond any run.
+     * The engine writes to {@code alerts} and reads {@code zone_metrics}, and the
+     * test harness truncates both between tests; TRUNCATE needs ACCESS EXCLUSIVE
+     * while the engine holds row locks, so the two deadlock. It surfaced as CI
+     * failing in unrelated suites — token reuse, the intelligence API — with
+     * "deadlock detected" on a TRUNCATE, and it grew more likely as the suite
+     * grew, because a longer run gives the timer more chances to fire mid-reset.
+     *
+     * <p>Tests drive {@code evaluate()} directly in fourteen places, so the timer
+     * contributed nothing to them but interference.
      */
     @Scheduled(
-            initialDelayString = "${citypulse.telemetry.stream-interval:PT5S}",
+            initialDelayString =
+                    "${citypulse.alerting.initial-delay:${citypulse.telemetry.stream-interval:PT5S}}",
             fixedDelayString = "${citypulse.alerting.interval:PT30S}")
     public void evaluate() {
         Instant notBefore = Timestamps.now().minus(properties.maxAge());

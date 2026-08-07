@@ -35,6 +35,21 @@ spring:
       ddl-auto: validate
 
 citypulse:
+  alerting:
+    # The engine's timer must never fire during a test run.
+    #
+    # It writes to alerts and reads zone_metrics while resetMutableState
+    # truncates both between tests. TRUNCATE takes ACCESS EXCLUSIVE; the engine
+    # holds row locks; the two deadlock. CI failed intermittently in suites with
+    # nothing to do with alerting — token reuse, the intelligence API — because
+    # the victim is whichever transaction the database picks.
+    #
+    # Pushed beyond any plausible run rather than disabled: the bean, its
+    # schedule wiring and its configuration still load, so a mistake in any of
+    # them still fails the build. Tests that want a cycle call evaluate()
+    # directly, which fourteen of them already do.
+    initial-delay: PT24H
+
   app:
     name: CityPulse OS
     frontend-url: http://localhost:3000
