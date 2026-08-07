@@ -4,9 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import {
-  Badge,
   Card,
-  DemoDataBadge,
   CardHeader,
   EmptyState,
   ErrorState,
@@ -20,11 +18,12 @@ import {
   ZONE_TYPE_LABELS,
 } from "@/components/map/ZoneMap";
 import { geoApi } from "@/lib/api/endpoints";
-import type { ConditionLevel, Zone, ZoneCondition } from "@/lib/api/types";
+import type { Zone, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
 import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
 import { KpiRow } from "@/components/live/KpiRow";
 import { RiskDistribution, ZoneRiskChart } from "@/components/charts/ZoneRiskChart";
+import { ZoneIntelligence } from "@/components/live/ZoneIntelligence";
 import { LiveStatusBar } from "@/components/live/LiveStatusBar";
 import { formatArea, formatNumber } from "@/lib/format";
 
@@ -172,9 +171,10 @@ export default function CommandCenterPage() {
             )}
           </Card>
 
-          <ZoneDetailPanel
+          <ZoneIntelligence
             zone={selectedZone}
             condition={selectedZone ? conditions.get(selectedZone.id) : undefined}
+            cityId={city.id}
           />
         </div>
       </div>
@@ -269,113 +269,6 @@ function ConditionLegend() {
     </div>
   );
 }
-
-function ZoneDetailPanel({
-  zone,
-  condition,
-}: {
-  zone: Zone | null;
-  condition: ZoneCondition | undefined;
-}) {
-  if (!zone) {
-    return (
-      <Card>
-        <CardHeader title="Zone detail" />
-        <EmptyState
-          title="No zone selected"
-          description="Select a zone on the map or in the table below to see its details."
-        />
-      </Card>
-    );
-  }
-
-  // Static attributes the platform holds regardless of whether telemetry flows.
-  const attributes = [
-    { label: "Code", value: zone.code },
-    { label: "Type", value: ZONE_TYPE_LABELS[zone.zoneType] },
-    { label: "Road capacity", value: zone.roadCapacityVph ? `${formatNumber(zone.roadCapacityVph)} veh/h` : "Not recorded" },
-    { label: "Population", value: zone.population ? formatNumber(zone.population) : "Not recorded" },
-    { label: "Area", value: formatArea(zone.areaSqKm) },
-  ];
-
-  // Current readings, listed separately so a reader can tell at a glance which
-  // half of the panel is a fact about the place and which is a measurement of
-  // this moment.
-  const readings: Array<[string, string]> = condition?.hasData
-    ? [
-        ["Congestion", condition.congestionLevel ?? "Not measured"],
-        [
-          "Occupancy",
-          condition.occupancyRatio
-            ? `${(Number(condition.occupancyRatio) * 100).toFixed(0)}% of capacity`
-            : "Not measured",
-        ],
-        [
-          "Average speed",
-          condition.averageSpeedKph
-            ? `${Number(condition.averageSpeedKph).toFixed(1)} km/h`
-            : "Not measured",
-        ],
-        ["Air quality", condition.aqi != null ? `${condition.aqi} AQI` : "Not measured"],
-        ["Open incidents", String(condition.activeIncidents)],
-      ]
-    : [];
-
-  return (
-    <Card>
-      <CardHeader
-        title={zone.name}
-        description={ZONE_TYPE_LABELS[zone.zoneType]}
-        action={
-          condition?.hasData && condition.riskLevel ? (
-            <Badge level={CONDITION_BADGE[condition.riskLevel]}>
-              {condition.riskLevel}
-              {condition.riskScore && ` · ${Number(condition.riskScore).toFixed(0)}`}
-            </Badge>
-          ) : zone.demoData ? (
-            <DemoDataBadge />
-          ) : undefined
-        }
-      />
-
-      {condition && !condition.hasData && (
-        <div className="border-b border-line-subtle px-5 py-2.5 text-[12px] text-content-tertiary">
-          No recent telemetry for this zone — its feed may have stopped.
-        </div>
-      )}
-
-      <dl className="divide-y divide-line-subtle">
-        {readings.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between gap-4 px-5 py-2.5">
-            <dt className="text-[13px] text-content-tertiary">{label}</dt>
-            <dd className="text-[13px] tabular text-content-primary">{value}</dd>
-          </div>
-        ))}
-        {attributes.map((attribute) => (
-          <div key={attribute.label} className="flex items-center justify-between gap-4 px-5 py-2.5">
-            <dt className="text-[13px] text-content-tertiary">{attribute.label}</dt>
-            <dd className="text-[13px] tabular text-content-primary">{attribute.value}</dd>
-          </div>
-        ))}
-      </dl>
-
-      {condition?.hasData && (
-        <div className="border-t border-line-subtle px-5 py-3 text-[11px] text-content-tertiary">
-          Readings from the window at{" "}
-          {condition.windowStart ? new Date(condition.windowStart).toLocaleTimeString() : "—"} ·{" "}
-          {condition.sampleCount} raw {condition.sampleCount === 1 ? "event" : "events"}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-const CONDITION_BADGE: Record<ConditionLevel, "normal" | "moderate" | "high" | "critical"> = {
-  NORMAL: "normal",
-  MODERATE: "moderate",
-  HIGH: "high",
-  CRITICAL: "critical",
-};
 
 function ZoneTable({
   zones,
