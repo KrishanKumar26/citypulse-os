@@ -12,13 +12,15 @@ import {
   ErrorState,
   LoadingState,
 } from "@/components/ui";
-import { forecastApi, geoApi } from "@/lib/api/endpoints";
+import { forecastApi, geoApi, liveApi } from "@/lib/api/endpoints";
 import type {
   ConditionLevel,
   ForecastMetric,
   ForecastPoint,
   ModelSummary,
+  ZoneHistoryPoint,
 } from "@/lib/api/types";
+import { ForecastChart } from "@/components/charts/ForecastChart";
 import { useSelectedCity } from "@/lib/city-context";
 
 /**
@@ -32,11 +34,40 @@ import { useSelectedCity } from "@/lib/city-context";
  * to take on trust.
  */
 
-const METRICS: Array<{ value: ForecastMetric; label: string; unit: string; decimals: number }> = [
-  { value: "occupancy_ratio", label: "Congestion", unit: "of capacity", decimals: 2 },
-  { value: "average_speed_kph", label: "Average speed", unit: "km/h", decimals: 1 },
-  { value: "vehicle_count", label: "Vehicle volume", unit: "vehicles", decimals: 0 },
-  { value: "risk_score", label: "Composite risk", unit: "/ 100", decimals: 0 },
+const METRICS: Array<{
+  value: ForecastMetric;
+  label: string;
+  unit: string;
+  decimals: number;
+  /** Pulls the matching observation out of a history point, so the chart plots
+      the same quantity the forecast predicts. Null where history does not carry
+      it — vehicle count is not stored per window. */
+  readHistory: (p: ZoneHistoryPoint) => number | null;
+  /** Display multiplier. Ratios are stored 0-1 and read as percentages. */
+  scale: number;
+}> = [
+  {
+    value: "occupancy_ratio", label: "Congestion", unit: "of capacity", decimals: 2,
+    readHistory: (p) => (p.occupancyRatio === null ? null : Number(p.occupancyRatio)),
+    scale: 1,
+  },
+  {
+    value: "average_speed_kph", label: "Average speed", unit: "km/h", decimals: 1,
+    readHistory: (p) => (p.averageSpeedKph === null ? null : Number(p.averageSpeedKph)),
+    scale: 1,
+  },
+  {
+    value: "vehicle_count", label: "Vehicle volume", unit: "vehicles", decimals: 0,
+    // Curated windows do not store a vehicle count, so this metric charts its
+    // forecast without an observed line rather than plotting a stand-in.
+    readHistory: () => null,
+    scale: 1,
+  },
+  {
+    value: "risk_score", label: "Composite risk", unit: "/ 100", decimals: 0,
+    readHistory: (p) => (p.riskScore === null ? null : Number(p.riskScore)),
+    scale: 1,
+  },
 ];
 
 const HORIZON_LABELS: Record<number, string> = {
@@ -77,6 +108,16 @@ export default function ForecastPage() {
     queryKey: ["forecast", selectedZoneId, metric],
     queryFn: () => forecastApi.forZone(selectedZoneId!, metric),
     enabled: Boolean(selectedZoneId),
+  });
+
+  // The observed line the forecast continues from. Kept separate from the
+  // forecast query so a missing history degrades the chart to predictions alone
+  // rather than failing the page.
+  const historyQuery = useQuery({
+    queryKey: ["forecast-history", selectedZoneId],
+    queryFn: () => liveApi.history(selectedZoneId!),
+    enabled: Boolean(selectedZoneId),
+    staleTime: 60_000,
   });
 
   const accuracyQuery = useQuery({
@@ -172,7 +213,22 @@ export default function ForecastPage() {
             description="This zone is monitored but has no stored predictions. Run the prediction job: python -m ml.predict"
           />
         ) : (
-          <HorizonTable points={forecastQuery.data.horizons} decimals={config.decimals} unit={config.unit} />
+          <>
+            {/* The chart first, the table under it. A table can be read but not
+                seen: whether the prediction continues the trend or breaks it,
+                and whether the interval is narrow enough for the number to mean
+                anything, are shape questions. The table keeps the exact values
+                for anyone who needs them. */}
+            <ForecastChart
+              history={historyQuery.data?.points ?? []}
+              horizons={forecastQuery.data.horizons}
+              readHistory={config.readHistory}
+              scale={config.scale}
+              unit={config.unit}
+              decimals={config.decimals}
+            />
+            <HorizonTable points={forecastQuery.data.horizons} decimals={config.decimals} unit={config.unit} />
+          </>
         )}
       </Card>
 
