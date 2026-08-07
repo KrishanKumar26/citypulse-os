@@ -61,6 +61,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
     heading: "Data",
     items: [
       { label: "Data Sources", href: "/data-sources", icon: "database", available: true },
+      { label: "Data Health", href: "/data-health", icon: "shield", available: true },
       { label: "API Management", href: "/api-keys", icon: "key", available: false },
     ],
   },
@@ -164,6 +165,7 @@ function NavIcon({ name }: { name: string }) {
     layers: "M12 3l9 5-9 5-9-5zM3 13l9 5 9-5",
     bell: "M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M13.7 21a2 2 0 01-3.4 0",
     chart: "M3 3v18h18M8 16V10M13 16V6M18 16v-4",
+    shield: "M12 3l8 3v6c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V6zM9 12l2 2 4-4",
     database: "M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6",
     key: "M15 7a4 4 0 11-4 4l-7 7v3h3l7-7",
     settings: "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1A1.7 1.7 0 008.9 19a1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1A1.7 1.7 0 004.6 8.9a1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z",

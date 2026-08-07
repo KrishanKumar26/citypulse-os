@@ -87,4 +87,54 @@ class DataSourceIT extends IntegrationTest {
     void requiresAuth() throws Exception {
         mockMvc.perform(get("/api/v1/data-sources")).andExpect(status().isUnauthorized());
     }
+    @Test
+    @DisplayName("reports pipeline quality, and only the stages that are instrumented")
+    void reportsPipelineQuality() throws Exception {
+        Tokens tokens = loginAs("health-stages@example.com", RoleName.CITY_OPERATOR);
+
+        JsonNode data = objectMapper.readTree(mockMvc.perform(get("/api/v1/data-sources/health")
+                        .header("Authorization", "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).path("data");
+
+        assertThat(data.path("windowHours").asInt()).isPositive();
+        assertThat(data.path("stages").isArray()).isTrue();
+
+        // A stage absent from this list is uninstrumented, not idle. Filling it
+        // in with zeroes would report a stage nobody measures as a stage that
+        // handled nothing — a clean bill of health nobody issued.
+        for (JsonNode stage : data.path("stages")) {
+            assertThat(stage.path("stage").asText()).isNotBlank();
+            assertThat(stage.path("recordsReceived").asLong()).isNotNegative();
+        }
+    }
+
+    @Test
+    @DisplayName("leaves the validity ratio null when nothing arrived")
+    void nullRatioForAnEmptyWindow() throws Exception {
+        Tokens tokens = loginAs("health-empty@example.com", RoleName.CITY_OPERATOR);
+
+        // The test database has no quality metrics, so there are no stages at
+        // all — which must not be rendered as a pipeline that received nothing
+        // and validated none of it.
+        JsonNode data = objectMapper.readTree(mockMvc.perform(get("/api/v1/data-sources/health")
+                        .header("Authorization", "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).path("data");
+
+        for (JsonNode stage : data.path("stages")) {
+            if (stage.path("recordsReceived").asLong() == 0) {
+                // A ratio over an empty denominator is undefined. Zero would say
+                // "nothing was valid", which is a different and alarming claim.
+                assertThat(notMeasured(stage, "validityRatio")).isTrue();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("health requires authentication too")
+    void healthRequiresAuth() throws Exception {
+        mockMvc.perform(get("/api/v1/data-sources/health")).andExpect(status().isUnauthorized());
+    }
+
 }

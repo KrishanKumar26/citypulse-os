@@ -6,6 +6,7 @@ import com.citypulse.user.domain.User;
 import com.citypulse.user.domain.UserStatus;
 import com.citypulse.user.repository.RoleRepository;
 import com.citypulse.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +77,18 @@ public abstract class IntegrationTest {
      */
     @Autowired
     protected com.citypulse.common.web.RequestIdFilter requestIdFilter;
+
+    /**
+     * True when a field is absent or null in a response.
+     *
+     * <p>Deliberately {@code hasNonNull} rather than {@code path(field).isNull()}:
+     * Jackson omits null fields entirely, so the latter returns false for a key
+     * that was never serialised — an assertion that passes for the wrong reason.
+     * Four assertions in this suite once did exactly that.
+     */
+    protected boolean notMeasured(JsonNode node, String field) {
+        return !node.hasNonNull(field);
+    }
 
     @BeforeEach
     void setUpIntegrationTest() {

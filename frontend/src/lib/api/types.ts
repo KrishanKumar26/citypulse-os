@@ -651,3 +651,27 @@ export interface DataSourceList {
   silent: number;
   sources: DataSourceSummary[];
 }
+
+export interface StageQuality {
+  stage: string;
+  windows: number;
+  recordsReceived: number;
+  recordsValid: number;
+  recordsRejected: number;
+  recordsDuplicate: number;
+  recordsLate: number;
+  /** Null when the stage received nothing — undefined, not a ratio of zero. */
+  validityRatio: string | null;
+  /** Null when the pipeline recorded no lag — absent, not zero. */
+  maxLagSeconds: number | null;
+  newestWindowEnd: string | null;
+}
+
+export interface PipelineHealth {
+  windowHours: number;
+  /** Only instrumented stages. A missing stage is unmeasured, not idle. */
+  stages: StageQuality[];
+  deadLettered: number;
+  silentSources: number;
+  totalSources: number;
+}

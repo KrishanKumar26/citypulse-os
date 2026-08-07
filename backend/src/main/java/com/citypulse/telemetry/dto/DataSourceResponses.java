@@ -2,6 +2,7 @@ package com.citypulse.telemetry.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -40,6 +41,51 @@ public final class DataSourceResponses {
             boolean silent,
 
             boolean demoData
+    ) {
+    }
+
+    /**
+     * What one pipeline stage did with what it was given.
+     *
+     * <p>Counted by the loader as it ran. A validity ratio derived afterwards
+     * from the curated tables would always read 100%, because a rejected record
+     * is not there to be counted.
+     */
+    public record StageQuality(
+            @Schema(description = "VALIDATE, TRANSFORM, LOAD — whichever the pipeline instruments")
+            String stage,
+            long windows,
+            long recordsReceived,
+            long recordsValid,
+            long recordsRejected,
+            long recordsDuplicate,
+            long recordsLate,
+
+            @Schema(description = "Valid over received. Null when the stage received nothing, "
+                    + "which is not the same as a ratio of zero.")
+            BigDecimal validityRatio,
+
+            @Schema(description = "Worst lag between an event happening and being loaded. Null "
+                    + "when the pipeline did not record one — absent, not zero.")
+            Long maxLagSeconds,
+
+            Instant newestWindowEnd
+    ) {
+    }
+
+    public record PipelineHealth(
+            int windowHours,
+
+            @Schema(description = "Only the stages the pipeline actually writes metrics for. "
+                    + "A stage missing here is uninstrumented, not idle.")
+            List<StageQuality> stages,
+
+            @Schema(description = "Records the pipeline refused and set aside in this window")
+            long deadLettered,
+
+            @Schema(description = "Sources that are ACTIVE and delivered nothing")
+            int silentSources,
+            int totalSources
     ) {
     }
 

@@ -78,10 +78,6 @@ class LiveIntelligenceIT extends IntegrationTest {
      * reports false for a missing node. Either shape means "not measured", which
      * is what the assertion is actually about.
      */
-    private boolean notMeasured(JsonNode zone, String field) {
-        return !zone.hasNonNull(field);
-    }
-
     private JsonNode snapshot(String accessToken) throws Exception {
         String body = mockMvc.perform(authGet("/api/v1/live/by-slug/" + BENGALURU, accessToken))
                 .andExpect(status().isOk())

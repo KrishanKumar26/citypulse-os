@@ -40,4 +40,21 @@ public class DataSourceController {
     public ResponseEntity<ApiResponse<DataSourceResponses.SourceList>> list() {
         return ResponseEntity.ok(ApiResponse.ok(service.list()));
     }
+
+    /**
+     * Whether the pipeline behind the numbers is healthy.
+     *
+     * <p>A different question from whether each feed is delivering: this is what
+     * arrived against what was kept. Counted by the loader as it ran, because a
+     * validity ratio derived afterwards from the curated tables cannot see a
+     * record that was rejected and would always read 100%.
+     */
+    @GetMapping("/health")
+    @PreAuthorize("hasAuthority('" + Permissions.TELEMETRY_READ + "')")
+    @Operation(summary = "Pipeline quality: received against kept, rejected, late, and worst lag",
+            description = "Requires telemetry:read. Only stages the pipeline instruments appear; "
+                    + "a missing stage is uninstrumented, not idle.")
+    public ResponseEntity<ApiResponse<DataSourceResponses.PipelineHealth>> health() {
+        return ResponseEntity.ok(ApiResponse.ok(service.health()));
+    }
 }

@@ -1,6 +1,7 @@
 import { api } from "./client";
 import type {
   DataSourceList,
+  PipelineHealth,
   CityHistory,
   AlertDetail,
   AlertStatus,
@@ -70,6 +71,9 @@ export const geoApi = {
 
 export const dataSourceApi = {
   list: () => api.get<DataSourceList>("/api/v1/data-sources"),
+
+  /** Pipeline quality: what arrived against what was kept. */
+  health: () => api.get<PipelineHealth>("/api/v1/data-sources/health"),
 };
 
 export const platformApi = {

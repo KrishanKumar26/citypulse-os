@@ -7,6 +7,8 @@ import com.citypulse.telemetry.repository.DataSourceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -39,6 +41,53 @@ public class DataSourceService {
 
     public DataSourceService(DataSourceRepository repository) {
         this.repository = repository;
+    }
+
+    /**
+     * Whether the pipeline behind the numbers is healthy.
+     *
+     * <p>Distinct from {@link #list()}, which answers "is each feed delivering".
+     * This answers "is what arrived any good" — received against kept, rejected,
+     * duplicated, late, and how far behind the worst record was.
+     *
+     * <p>Only stages the pipeline writes metrics for appear. A stage that is
+     * absent is uninstrumented, not idle, and the response says so rather than
+     * letting a reader infer a clean bill of health from an empty row.
+     */
+    @Transactional(readOnly = true)
+    public DataSourceResponses.PipelineHealth health() {
+        Instant since = Timestamps.now().minus(Duration.ofHours(WINDOW_HOURS));
+
+        List<DataSourceResponses.StageQuality> stages = repository.qualityByStage(since).stream()
+                .map(row -> {
+                    long received = row.getReceived() == null ? 0 : row.getReceived();
+                    long valid = row.getValid() == null ? 0 : row.getValid();
+                    return new DataSourceResponses.StageQuality(
+                            row.getStage(),
+                            row.getWindows() == null ? 0 : row.getWindows(),
+                            received, valid,
+                            row.getRejected() == null ? 0 : row.getRejected(),
+                            row.getDuplicates() == null ? 0 : row.getDuplicates(),
+                            row.getLate() == null ? 0 : row.getLate(),
+                            // Null, not zero, when nothing arrived. A ratio over an
+                            // empty denominator is undefined, and rendering it as
+                            // 0% would report a quiet hour as a broken pipeline.
+                            received == 0
+                                    ? null
+                                    : BigDecimal.valueOf(valid)
+                                            .divide(BigDecimal.valueOf(received), 4, RoundingMode.HALF_UP),
+                            row.getMaxLagSeconds(),
+                            row.getNewestWindowEnd());
+                })
+                .toList();
+
+        DataSourceResponses.SourceList sources = list();
+        return new DataSourceResponses.PipelineHealth(
+                WINDOW_HOURS,
+                stages,
+                repository.deadLetteredSince(since),
+                sources.silent(),
+                sources.total());
     }
 
     @Transactional(readOnly = true)
