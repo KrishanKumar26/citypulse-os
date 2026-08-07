@@ -146,6 +146,38 @@ public interface ZoneMetricRepository extends JpaRepository<ZoneMetric, Long> {
                                          @Param("seconds") long seconds,
                                          @Param("limit") int limit);
 
+    /**
+     * Each zone's most recent window at or before a reference time, in one query.
+     *
+     * <p>For the trend beside a current reading. Fetched for the whole city at
+     * once rather than per zone: twenty zones would otherwise be twenty round
+     * trips to put an arrow on a table.
+     *
+     * <p>DISTINCT ON is PostgreSQL's, and the schema already depends on
+     * PostgreSQL semantics elsewhere — partial unique indexes, TIMESTAMPTZ — so
+     * this adds no portability constraint that was not already there.
+     */
+    @Query(value = """
+            SELECT DISTINCT ON (zone_id)
+                   zone_id      AS zoneId,
+                   window_start AS windowStart,
+                   risk_score   AS riskScore
+            FROM zone_metrics
+            WHERE zone_id IN :zoneIds
+              AND window_start <= :at
+              AND window_start >= :notBefore
+            ORDER BY zone_id, window_start DESC
+            """, nativeQuery = true)
+    List<PriorReading> findPriorReadings(@Param("zoneIds") List<Long> zoneIds,
+                                         @Param("at") Instant at,
+                                         @Param("notBefore") Instant notBefore);
+
+    interface PriorReading {
+        Long getZoneId();
+        Instant getWindowStart();
+        BigDecimal getRiskScore();
+    }
+
     /** Projection for {@link #findCityWindow}. */
     interface CityHistoryRow {
         Instant getWindowStart();

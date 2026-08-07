@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Badge, Card, CardHeader, EmptyState, Input, LoadingState, cn } from "@/components/ui";
+import { TrendBadge } from "@/components/charts/Sparkline";
 import type { ConditionLevel, Zone, ZoneCondition } from "@/lib/api/types";
 
 /**
@@ -17,12 +18,16 @@ import type { ConditionLevel, Zone, ZoneCondition } from "@/lib/api/types";
  * context for a zone someone has already chosen rather than the answer to
  * "where should I look".
  *
- * There is no trend column. It would need each zone's previous window, and the
- * snapshot carries only the current one; deriving it from consecutive snapshots
- * would read "steady" for every row, because on the hosted deployment the
- * pipeline writes once an hour and consecutive snapshots are the same numbers.
- * A column that always says the same thing is worse than an absent one — it
- * looks like a measurement.
+ * The trend column compares each zone's risk against its own window about an
+ * hour earlier, which the snapshot now carries. It was left out until the API
+ * could supply that: derived from consecutive snapshots it would have printed
+ * "steady" on every row, since the hosted pipeline writes hourly and successive
+ * snapshots hold identical numbers. A column that always says the same thing is
+ * worse than an absent one, because it looks like a measurement.
+ *
+ * A zone with no window an hour back shows "no trend yet" rather than a flat
+ * arrow. Unknown and unchanged are different, and the arrow is the place that
+ * conflation would be least visible.
  */
 
 const LEVELS: ConditionLevel[] = ["CRITICAL", "HIGH", "MODERATE", "NORMAL"];
@@ -52,6 +57,8 @@ interface Row {
   aqi: number | null;
   incidents: number | null;
   level: ConditionLevel | null;
+  /** Percentage change in risk against the zone's own earlier window. */
+  trend: number | null;
 }
 
 export function ZoneTable({
@@ -85,6 +92,12 @@ export function ZoneTable({
           aqi: has && c?.aqi != null ? c.aqi : null,
           incidents: has && c ? c.activeIncidents : null,
           level: has ? (c?.riskLevel ?? null) : null,
+          trend:
+            has && c?.riskScore != null && c.previousRiskScore != null
+              && Number(c.previousRiskScore) !== 0
+              ? ((Number(c.riskScore) - Number(c.previousRiskScore))
+                  / Math.abs(Number(c.previousRiskScore))) * 100
+              : null,
         };
       }),
     [zones, conditions],
@@ -197,6 +210,7 @@ export function ZoneTable({
                 <SortableHeader label="AQI" col="aqi" sort={sort} setSort={setSort} />
                 <SortableHeader label="Incidents" col="incidents" sort={sort} setSort={setSort} />
                 <SortableHeader label="Risk" col="risk" sort={sort} setSort={setSort} />
+                <th scope="col" className="px-4 py-2.5 text-right font-medium">Trend</th>
               </tr>
             </thead>
             <tbody>
@@ -231,6 +245,9 @@ export function ZoneTable({
                     <Cell value={r.aqi} decimals={0} />
                     <Cell value={r.incidents} decimals={0} />
                     <Cell value={r.risk} decimals={0} strong />
+                    <td className="px-4 py-2.5 text-right">
+                      <TrendBadge change={r.trend} />
+                    </td>
                   </tr>
                 );
               })}

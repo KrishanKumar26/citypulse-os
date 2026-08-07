@@ -469,4 +469,55 @@ class LiveIntelligenceIT extends IntegrationTest {
         }
     }
 
+    @Nested
+    @DisplayName("Zone trend")
+    class ZoneTrendTests {
+
+        @Test
+        @DisplayName("carries the reading an hour back, and says which window it is")
+        void carriesPriorReading() throws Exception {
+            Tokens tokens = loginAs("trend-has@example.com", RoleName.CITY_OPERATOR);
+            Instant nowWindow = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(5, ChronoUnit.MINUTES);
+            Instant hourAgo = nowWindow.minus(60, ChronoUnit.MINUTES);
+
+            insertWindow("BLR-WHF", hourAgo, "0.40", "40.00", "NORMAL", 90, "30.00", "NORMAL", 0, 6);
+            insertWindow("BLR-WHF", nowWindow, "0.90", "14.00", "CRITICAL", 240, "82.00", "CRITICAL", 2, 6);
+
+            JsonNode zone = zoneNode(snapshot(tokens.accessToken()), "BLR-WHF");
+
+            assertThat(zone.path("previousRiskScore").decimalValue())
+                    .isEqualByComparingTo(new java.math.BigDecimal("30.00"));
+            // The window is returned alongside, so a client can say what the
+            // comparison is against instead of implying an exact interval it
+            // has no way to guarantee.
+            assertThat(zone.hasNonNull("previousWindowStart")).isTrue();
+        }
+
+        @Test
+        @DisplayName("offers no trend rather than a stale one")
+        void refusesAnOutdatedComparison() throws Exception {
+            Tokens tokens = loginAs("trend-old@example.com", RoleName.CITY_OPERATOR);
+            Instant nowWindow = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(5, ChronoUnit.MINUTES);
+
+            // A zone whose only earlier window is from yesterday. Compared
+            // against it, the arrow would describe a day while looking exactly
+            // like one describing an hour.
+            insertWindow("BLR-KOR", nowWindow.minus(26, ChronoUnit.HOURS),
+                    "0.30", "45.00", "NORMAL", 80, "20.00", "NORMAL", 0, 6);
+            insertWindow("BLR-KOR", nowWindow, "0.90", "14.00", "CRITICAL", 240, "82.00", "CRITICAL", 2, 6);
+
+            JsonNode zone = zoneNode(snapshot(tokens.accessToken()), "BLR-KOR");
+
+            assertThat(notMeasured(zone, "previousRiskScore")).isTrue();
+            assertThat(notMeasured(zone, "previousWindowStart")).isTrue();
+        }
+    }
+
+    private static JsonNode zoneNode(JsonNode snapshot, String code) {
+        for (JsonNode zone : snapshot.path("zones")) {
+            if (code.equals(zone.path("zoneCode").asText())) return zone;
+        }
+        throw new AssertionError("zone " + code + " not in snapshot");
+    }
+
 }

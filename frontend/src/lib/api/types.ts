@@ -169,6 +169,14 @@ export interface ZoneCondition {
   riskScore: string | null;
   riskLevel: ConditionLevel | null;
 
+  /** Risk about an hour earlier, for a trend. Null when the zone has no window
+      that far back — which is not the same as unchanged, and must not render as
+      a flat arrow. */
+  previousRiskScore: string | null;
+  /** The window the comparison is against, so a caller can say what it compared
+      to rather than implying an exact interval. */
+  previousWindowStart: string | null;
+
   /** Raw events behind the window. A low count means a thin sample. */
   sampleCount: number;
   demoData: boolean;

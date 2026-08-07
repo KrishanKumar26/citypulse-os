@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -129,8 +130,21 @@ public class LiveMetricsService {
                 .collect(Collectors.toMap(ZoneMetric::getZoneId, Function.identity(),
                         (a, b) -> a, LinkedHashMap::new));
 
+        // One query for the whole city's prior readings, not one per zone: twenty
+        // zones would otherwise be twenty round trips to put an arrow on a table.
+        Map<Long, ZoneMetricRepository.PriorReading> prior = zones.isEmpty()
+                ? Map.of()
+                : metricRepository.findPriorReadings(
+                        zones.stream().map(Zone::getId).toList(),
+                        now.minus(TREND_LOOKBACK),
+                        now.minus(TREND_MAX_AGE))
+                .stream()
+                .collect(Collectors.toMap(
+                        ZoneMetricRepository.PriorReading::getZoneId, Function.identity(),
+                        (a, b) -> a));
+
         List<TelemetryResponses.ZoneCondition> conditions = zones.stream()
-                .map(zone -> toCondition(zone, latest.get(zone.getId())))
+                .map(zone -> toCondition(zone, latest.get(zone.getId()), prior.get(zone.getId())))
                 .sorted(Comparator.comparing(TelemetryResponses.ZoneCondition::zoneCode))
                 .toList();
 
@@ -156,7 +170,31 @@ public class LiveMetricsService {
         );
     }
 
+    /**
+     * How far back the trend compares to.
+     *
+     * <p>An hour is long enough that five-minute noise does not read as a move,
+     * and short enough that the comparison is still about now.
+     */
+    private static final Duration TREND_LOOKBACK = Duration.ofHours(1);
+
+    /**
+     * How far past the lookback a prior window may be and still count.
+     *
+     * <p>Without a floor, a zone whose feed stopped yesterday would be compared
+     * against yesterday and the arrow would describe a day, not an hour, while
+     * looking identical to one that does. Nothing older than this produces no
+     * trend at all, which the client renders as "no trend yet" rather than as
+     * steady.
+     */
+    private static final Duration TREND_MAX_AGE = Duration.ofHours(3);
+
     private TelemetryResponses.ZoneCondition toCondition(Zone zone, ZoneMetric metric) {
+        return toCondition(zone, metric, null);
+    }
+
+    private TelemetryResponses.ZoneCondition toCondition(
+            Zone zone, ZoneMetric metric, ZoneMetricRepository.PriorReading prior) {
         if (metric == null) {
             // Every metric null, hasData false. The client renders "no data"
             // rather than a zero-valued tile.
@@ -169,6 +207,7 @@ public class LiveMetricsService {
                     null, null,
                     null, null, null,
                     0, 0,
+                    null, null,
                     null, null,
                     0, false, false
             );
@@ -186,6 +225,8 @@ public class LiveMetricsService {
                 metric.getActiveIncidents() == null ? 0 : metric.getActiveIncidents(),
                 metric.getActiveEvents() == null ? 0 : metric.getActiveEvents(),
                 metric.getRiskScore(), metric.getRiskLevel(),
+                prior == null ? null : prior.getRiskScore(),
+                prior == null ? null : prior.getWindowStart(),
                 metric.getSampleCount(), metric.isDemoData(), true
         );
     }

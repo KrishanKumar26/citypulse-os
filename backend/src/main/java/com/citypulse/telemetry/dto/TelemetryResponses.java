@@ -58,6 +58,15 @@ public final class TelemetryResponses {
             BigDecimal riskScore,
             String riskLevel,
 
+            @Schema(description = "This zone's risk about an hour before the current window, "
+                    + "for a trend. Null when the zone has no window that far back — which is "
+                    + "not the same as no change, and must not be rendered as one.")
+            BigDecimal previousRiskScore,
+
+            @Schema(description = "Start of the window previousRiskScore came from, so a caller "
+                    + "can say what the comparison is against rather than implying an interval")
+            Instant previousWindowStart,
+
             @Schema(description = "Raw events behind this window. A low count means a thin sample.")
             int sampleCount,
             @Schema(description = "True when this zone's telemetry is synthetic (PRD §42)")
