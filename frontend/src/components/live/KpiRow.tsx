@@ -1,7 +1,8 @@
 "use client";
 
-import { Badge, Metric, Skeleton, cn } from "@/components/ui";
-import type { CityKpis, ConditionLevel } from "@/lib/api/types";
+import { Metric, Skeleton, cn } from "@/components/ui";
+import { CityHealthRing } from "@/components/charts/CityHealthRing";
+import type { CityKpis } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 
 /**
@@ -22,13 +23,6 @@ import { formatNumber } from "@/lib/format";
  * operators are currently dealing with. Ungrouped, congestion sat next to air
  * quality and implied a relationship the platform does not claim.
  */
-
-const RISK_WORD: Record<ConditionLevel, string> = {
-  NORMAL: "Normal",
-  MODERATE: "Elevated",
-  HIGH: "High",
-  CRITICAL: "Critical",
-};
 
 // Ground and edge per severity. The tints are the existing status-*-bg tokens,
 // so this card cannot drift away from the badge, map marker and alert row that
@@ -62,11 +56,6 @@ function percent(ratio: string | null): string | null {
 export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: boolean }) {
   const risk = kpis?.overallRiskLevel ?? null;
   const riskStatus = risk ? LEVEL_TO_STATUS[risk] : null;
-
-  // Coverage qualifies every figure on this row, so it is stated once against
-  // the composite rather than repeated on each tile. A city average over three
-  // of twenty zones is a different claim from one over all twenty.
-  const coverage = kpis ? `${kpis.zonesReporting} of ${kpis.zonesMonitored} zones reporting` : undefined;
 
   const groups: { heading: string; metrics: Parameters<typeof Metric>[0][] }[] = [
     {
@@ -132,18 +121,19 @@ export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: bool
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
       {/*
-        Composite risk, given the weight of a headline rather than a tile.
+        Composite risk as a ring rather than a numeral.
 
-        The card takes the colour of the level it is reporting — ground tint and
-        a solid edge, not just a coloured numeral. This is the one place on the
-        page where the surface itself should carry meaning: a critical city and a
-        calm one should be distinguishable across a room, before any number is
-        read. Everywhere else the ground stays neutral, so this stays a signal
-        rather than becoming wallpaper.
+        A bare "55 / 100" cannot be placed without knowing where the bands fall,
+        so the reader has to be told the scale somewhere else or guess it. The
+        arc carries the scale with the value, and the three measured inputs
+        beneath answer the question the number provokes — 55 *of what* — and show
+        when one signal is carrying the whole score. A city at 55 from one
+        incident needs a different response from one at 55 because every road is
+        full, and the single figure cannot tell those apart.
       */}
       <div
         className={cn(
-          "relative flex flex-col justify-between overflow-hidden rounded-lg border px-5 py-4 shadow-[var(--shadow-card)] transition-colors",
+          "relative overflow-hidden rounded-lg border shadow-[var(--shadow-card)] transition-colors",
           riskStatus ? RISK_CARD[riskStatus] : "border-line-subtle bg-surface-raised",
         )}
       >
@@ -154,23 +144,11 @@ export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: bool
           />
         )}
         {loading ? (
-          <Skeleton className="h-14 w-32" />
+          <div className="flex h-[280px] items-center justify-center">
+            <Skeleton className="h-28 w-28 rounded-full" />
+          </div>
         ) : (
-          <>
-            <Metric
-              label="Composite risk"
-              value={kpis?.averageRiskScore ? Number(kpis.averageRiskScore).toFixed(0) : null}
-              unit="/ 100"
-              level={riskStatus}
-              emphasis="hero"
-              note={coverage}
-            />
-            {risk && (
-              <div className="mt-3">
-                <Badge level={LEVEL_TO_STATUS[risk]}>{RISK_WORD[risk]}</Badge>
-              </div>
-            )}
-          </>
+          <CityHealthRing kpis={kpis} />
         )}
       </div>
 

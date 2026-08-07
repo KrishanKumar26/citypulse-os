@@ -29,28 +29,43 @@ interface NavItem {
 
 const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
   {
-    heading: "Operations",
+    heading: "Overview",
     items: [
       { label: "Command Center", href: "/command-center", icon: "grid", available: true },
       { label: "Live Intelligence", href: "/live", icon: "activity", available: true },
-      { label: "Forecast", href: "/forecast", icon: "trending", available: true },
-      { label: "What-If Simulator", href: "/simulator", icon: "beaker", available: true },
     ],
   },
   {
     heading: "Intelligence",
     items: [
       { label: "AI Insights", href: "/insights", icon: "sparkle", available: true },
+      { label: "Forecast", href: "/forecast", icon: "trending", available: true },
+      { label: "What-If Simulator", href: "/simulator", icon: "beaker", available: true },
       { label: "Digital Twin", href: "/digital-twin", icon: "layers", available: false },
-      { label: "Alerts", href: "/alerts", icon: "bell", available: true },
-      { label: "Analytics", href: "/analytics", icon: "chart", available: false },
     ],
   },
   {
-    heading: "Platform",
+    heading: "Operations",
+    items: [
+      { label: "Alerts", href: "/alerts", icon: "bell", available: true },
+    ],
+  },
+  {
+    heading: "Analytics",
+    items: [
+      { label: "City Analytics", href: "/analytics", icon: "chart", available: false },
+    ],
+  },
+  {
+    heading: "Data",
     items: [
       { label: "Data Sources", href: "/data-sources", icon: "database", available: false },
       { label: "API Management", href: "/api-keys", icon: "key", available: false },
+    ],
+  },
+  {
+    heading: "System",
+    items: [
       { label: "Settings", href: "/settings", icon: "settings", available: true },
     ],
   },
@@ -94,12 +109,21 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors",
+                        "relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2 text-[13px] transition-colors",
                         active
-                          ? "bg-accent-subtle text-accent"
+                          ? "bg-accent-subtle font-medium text-accent"
                           : "text-content-secondary hover:bg-surface-hover hover:text-content-primary",
                       )}
                     >
+                      {/* A solid rail beside the tinted ground. On a dark field a
+                          tint alone is a weak signal, and finding your place in a
+                          fifteen-item rail should not take a second look. */}
+                      {active && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-y-1 left-0 w-[2px] rounded-full bg-accent"
+                        />
+                      )}
                       <NavIcon name={item.icon} />
                       <span className="flex-1 truncate">{item.label}</span>
                       {!item.available && (
