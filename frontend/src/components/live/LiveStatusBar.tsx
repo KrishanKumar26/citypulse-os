@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Button, DemoDataBadge } from "@/components/ui";
+import { Badge, Button } from "@/components/ui";
 import type { LiveStatus } from "@/lib/live/useLiveSnapshot";
 import type { CitySnapshot } from "@/lib/api/types";
 
@@ -80,7 +80,6 @@ export function LiveStatusBar({
         </Badge>
       )}
 
-      {snapshot?.demoData && <DemoDataBadge />}
 
       <div className="flex-1" />
 

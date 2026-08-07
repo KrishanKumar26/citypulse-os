@@ -312,3 +312,88 @@ export function ComingSoon({ module, phase, capabilities }: {
     </div>
   );
 }
+
+/**
+ * A measured quantity, presented so its weight matches its importance.
+ *
+ * The Command Center previously rendered eight identical tiles, so composite
+ * risk — the number the whole page exists to communicate — looked exactly like
+ * area coverage, which never changes. Emphasis is a property of the measurement
+ * here rather than of the markup around it, so a screen cannot accidentally
+ * give a trivia figure the same standing as the headline one.
+ *
+ * `value === null` is a first-class state, not an empty string. A dashboard
+ * showing "0 km/h" where no reading exists reports a dead feed as gridlock. The
+ * absence is drawn quietly but explicitly, and `absenceReason` says *why* when
+ * the caller knows — "not measured" and "measured, just not in this window" are
+ * different facts and only one of them is a problem.
+ */
+export function Metric({
+  label,
+  value,
+  unit,
+  level,
+  note,
+  emphasis = "default",
+  absenceReason,
+}: {
+  label: string;
+  /** Null renders as an explicit absence, never as zero. */
+  value: string | null;
+  unit?: string;
+  level?: StatusLevel | null;
+  /** Qualifies what the value covers — coverage, basis, or condition. */
+  note?: string;
+  emphasis?: "hero" | "default";
+  /** Shown in place of the value when it is null. Defaults to "Not measured". */
+  absenceReason?: string;
+}) {
+  const hero = emphasis === "hero";
+
+  return (
+    <div className={cn("flex flex-col", hero ? "gap-1.5" : "gap-1")}>
+      <span
+        className={cn(
+          "font-medium uppercase tracking-[0.08em] text-content-tertiary",
+          hero ? "text-[11px]" : "text-[10px]",
+        )}
+      >
+        {label}
+      </span>
+
+      {value === null ? (
+        <span className={cn("text-content-disabled", hero ? "text-[15px]" : "text-[13px]")}>
+          {absenceReason ?? "Not measured"}
+        </span>
+      ) : (
+        <div className="flex items-baseline gap-1.5">
+          <span
+            className={cn(
+              "tabular font-semibold tracking-tight",
+              hero ? "text-[38px] leading-none" : "text-[22px] leading-none",
+              level ? METRIC_TEXT[level] : "text-content-primary",
+            )}
+          >
+            {value}
+          </span>
+          {unit && (
+            <span className={cn("text-content-tertiary", hero ? "text-[13px]" : "text-[11px]")}>
+              {unit}
+            </span>
+          )}
+        </div>
+      )}
+
+      {note && <span className="text-[11px] leading-snug text-content-tertiary">{note}</span>}
+    </div>
+  );
+}
+
+const METRIC_TEXT: Record<StatusLevel, string> = {
+  normal: "text-status-normal",
+  moderate: "text-status-moderate",
+  high: "text-status-high",
+  critical: "text-status-critical",
+  info: "text-info",
+  neutral: "text-content-primary",
+};

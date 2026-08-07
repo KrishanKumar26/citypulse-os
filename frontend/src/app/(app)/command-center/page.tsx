@@ -6,8 +6,8 @@ import { useMemo, useState } from "react";
 import {
   Badge,
   Card,
-  CardHeader,
   DemoDataBadge,
+  CardHeader,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -73,10 +73,14 @@ export default function CommandCenterPage() {
     <div className="p-5">
       <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-lg font-semibold tracking-tight">{city.name}</h1>
-            {city.demoData && <DemoDataBadge />}
-          </div>
+          {/*
+            Labelled once, in the top bar, which is on every page and now shows
+            at every width. Three identical "DEMO DATA" badges shared this
+            screen — top bar, here, and the status strip. Repetition does not
+            make the disclosure stronger; it turns it into decoration people
+            stop reading, which is the opposite of what PRD §42 is for.
+          */}
+          <h1 className="text-lg font-semibold tracking-tight">{city.name}</h1>
           <p className="mt-1 text-[13px] text-content-tertiary">
             {city.country} · {city.timezone} · {city.zoneCount} monitored{" "}
             {city.zoneCount === 1 ? "zone" : "zones"}

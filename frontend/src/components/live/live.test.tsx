@@ -60,7 +60,7 @@ describe("KpiRow", () => {
     expect(screen.getByText("142")).toBeInTheDocument();
   });
 
-  it("says 'not measured' rather than showing zero for an absent reading", () => {
+  it("states an absent reading rather than showing zero", () => {
     // The distinction the whole dashboard rests on: a dead traffic feed must not
     // render as "0 km/h", which reads as gridlock.
     render(
@@ -70,8 +70,15 @@ describe("KpiRow", () => {
       />,
     );
 
-    expect(screen.getAllByText("Not measured").length).toBeGreaterThanOrEqual(3);
+    // Two different absences, deliberately worded differently. Traffic missing
+    // means the platform has no reading at all; air quality missing usually
+    // means the slower feed has not landed in this five-minute window, which is
+    // expected rather than a fault. Collapsing both into "Not measured" made a
+    // normal cadence look like a broken sensor.
+    expect(screen.getAllByText("Not measured").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("No reading this window").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("0.0")).not.toBeInTheDocument();
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
   it("distinguishes a measured zero from an absent reading", () => {
@@ -90,6 +97,7 @@ describe("KpiRow", () => {
   it("shows skeletons instead of values while loading", () => {
     render(<KpiRow kpis={null} loading />);
     expect(screen.queryByText("Not measured")).not.toBeInTheDocument();
+    expect(screen.queryByText("No reading this window")).not.toBeInTheDocument();
   });
 });
 
@@ -150,10 +158,13 @@ describe("LiveStatusBar", () => {
     expect(screen.getByRole("button", { name: /reconnect/i })).toBeInTheDocument();
   });
 
-  it("labels synthetic data (PRD §42)", () => {
+  it("leaves the synthetic-data label to the shell", () => {
+    // This strip reports connection and freshness. It used to carry a third
+    // copy of the DEMO DATA badge; the guarantee is now asserted once, against
+    // the top bar, in components/layout/layout.test.tsx.
     render(
       <LiveStatusBar snapshot={snapshot()} status="live" lastEventAt={new Date()} onReconnect={vi.fn()} />,
     );
-    expect(screen.getByText("DEMO DATA")).toBeInTheDocument();
+    expect(screen.queryByText("DEMO DATA")).not.toBeInTheDocument();
   });
 });

@@ -67,7 +67,7 @@ export function Topbar({
 
       <CitySelector cities={cities} selected={selectedCity} onSelect={onSelectCity} />
 
-      {selectedCity?.demoData && <DemoDataBadge className="hidden sm:inline-flex" />}
+      {selectedCity?.demoData && <DemoDataBadge />}
 
       <div className="flex-1" />
 
