@@ -11,6 +11,13 @@ import { cn } from "@/components/ui";
  * would misrepresent the product's shape. They are visibly marked and lead to a
  * page that states what is missing — never to a broken screen or a control that
  * silently does nothing (PRD §30 of the execution prompt).
+ *
+ * `available` must match what the page actually does. These flags were written
+ * in Phase 2 and not revisited as Phases 4 to 7 shipped, so Live Intelligence,
+ * Forecast, the Simulator, AI Insights and Alerts all sat behind a "Soon" badge
+ * while working and serving real data. The rule cuts both ways: claiming a
+ * feature that does not exist and hiding one that does are the same failure,
+ * and the second is the one that survived to the first deployment.
  */
 
 interface NavItem {
@@ -25,17 +32,17 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
     heading: "Operations",
     items: [
       { label: "Command Center", href: "/command-center", icon: "grid", available: true },
-      { label: "Live Intelligence", href: "/live", icon: "activity", available: false },
-      { label: "Forecast", href: "/forecast", icon: "trending", available: false },
-      { label: "What-If Simulator", href: "/simulator", icon: "beaker", available: false },
+      { label: "Live Intelligence", href: "/live", icon: "activity", available: true },
+      { label: "Forecast", href: "/forecast", icon: "trending", available: true },
+      { label: "What-If Simulator", href: "/simulator", icon: "beaker", available: true },
     ],
   },
   {
     heading: "Intelligence",
     items: [
-      { label: "AI Insights", href: "/insights", icon: "sparkle", available: false },
+      { label: "AI Insights", href: "/insights", icon: "sparkle", available: true },
       { label: "Digital Twin", href: "/digital-twin", icon: "layers", available: false },
-      { label: "Alerts", href: "/alerts", icon: "bell", available: false },
+      { label: "Alerts", href: "/alerts", icon: "bell", available: true },
       { label: "Analytics", href: "/analytics", icon: "chart", available: false },
     ],
   },
@@ -48,6 +55,15 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
     ],
   },
 ];
+
+// Derived from NAV_SECTIONS rather than written down. The footer used to read
+// "Phase 2 · Frontend foundation", which was true when it was typed and wrong
+// for every release after it — the same staleness that left five working
+// modules badged "Soon". A count that cannot drift is worth more than a label
+// someone has to remember to change.
+const ALL_ITEMS = NAV_SECTIONS.flatMap((section) => section.items);
+const TOTAL_COUNT = ALL_ITEMS.length;
+const AVAILABLE_COUNT = ALL_ITEMS.filter((item) => item.available).length;
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -105,7 +121,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="border-t border-line-subtle px-5 py-3">
         <p className="text-[11px] text-content-disabled">
-          Phase 2 · Frontend foundation
+          {AVAILABLE_COUNT} of {TOTAL_COUNT} modules built · demo data
         </p>
       </div>
     </nav>
