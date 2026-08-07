@@ -15,7 +15,7 @@ import {
   CONDITION_COLORS,
   NO_DATA_COLOR,
 } from "@/components/map/ZoneMap";
-import { geoApi } from "@/lib/api/endpoints";
+import { geoApi, liveApi } from "@/lib/api/endpoints";
 import type { Zone, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
 import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
@@ -55,6 +55,16 @@ export default function CommandCenterPage() {
   });
 
   const { snapshot, status, lastEventAt, reconnect } = useLiveSnapshot(city?.slug ?? null);
+
+  // The city's recent series, for the trend beneath each KPI. Separate from the
+  // live snapshot because it changes on the pipeline's cadence rather than the
+  // stream's, and a failure here must cost a sparkline, not the dashboard.
+  const historyQuery = useQuery({
+    queryKey: ["city-history", city?.slug],
+    queryFn: () => liveApi.cityHistory(city!.slug),
+    enabled: Boolean(city),
+    staleTime: 5 * 60_000,
+  });
 
   const conditions = useMemo(() => {
     const map = new Map<string, ZoneCondition>();
@@ -96,7 +106,11 @@ export default function CommandCenterPage() {
         />
       </div>
 
-      <KpiRow kpis={snapshot?.kpis ?? null} loading={!snapshot} />
+      <KpiRow
+        kpis={snapshot?.kpis ?? null}
+        history={historyQuery.data ?? null}
+        loading={!snapshot}
+      />
 
       <div className="mt-5">
         <CoverageMetrics city={city} zones={zones} loading={zonesQuery.isLoading} />

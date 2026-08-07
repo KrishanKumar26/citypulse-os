@@ -221,6 +221,30 @@ export interface ZoneHistoryPoint {
   sampleCount: number;
 }
 
+export interface CityHistoryPoint {
+  windowStart: string;
+  /** Every measurement is nullable — a window nobody reported in is absent from
+      the series, and one where a signal was missing carries null for it. */
+  averageCongestion: string | null;
+  averageSpeedKph: string | null;
+  averageAqi: number | null;
+  averageRiskScore: string | null;
+  totalVehicleCount: number | null;
+  activeIncidents: number | null;
+  /** Zones that contributed to this window, so a caller can read its coverage. */
+  reportingZones: number;
+}
+
+export interface CityHistory {
+  cityId: string;
+  citySlug: string;
+  from: string;
+  to: string;
+  windows: number;
+  zonesMonitored: number;
+  points: CityHistoryPoint[];
+}
+
 export interface ZoneHistory {
   zoneId: string;
   zoneCode: string;

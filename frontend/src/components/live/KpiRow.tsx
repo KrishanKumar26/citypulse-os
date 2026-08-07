@@ -2,7 +2,8 @@
 
 import { Metric, Skeleton, cn } from "@/components/ui";
 import { CityHealthRing } from "@/components/charts/CityHealthRing";
-import type { CityKpis } from "@/lib/api/types";
+import { Sparkline, TrendBadge, trendOf } from "@/components/charts/Sparkline";
+import type { CityHistory, CityKpis } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 
 /**
@@ -53,11 +54,37 @@ function percent(ratio: string | null): string | null {
   return (Number(ratio) * 100).toFixed(0);
 }
 
-export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: boolean }) {
+export function KpiRow({
+  kpis,
+  history,
+  loading,
+}: {
+  kpis: CityKpis | null;
+  /** The city's recent series. Absent until it loads; the tiles render without
+      their trend rather than waiting for it. */
+  history?: CityHistory | null;
+  loading: boolean;
+}) {
+  // Read once per metric rather than per tile, so a tile and its sparkline
+  // cannot end up plotting different things.
+  const points = history?.points ?? [];
+  const series = {
+    congestion: points.map((p) => (p.averageCongestion === null ? null : Number(p.averageCongestion) * 100)),
+    speed: points.map((p) => (p.averageSpeedKph === null ? null : Number(p.averageSpeedKph))),
+    vehicles: points.map((p) => p.totalVehicleCount),
+    aqi: points.map((p) => p.averageAqi),
+  };
+
   const risk = kpis?.overallRiskLevel ?? null;
   const riskStatus = risk ? LEVEL_TO_STATUS[risk] : null;
 
-  const groups: { heading: string; metrics: Parameters<typeof Metric>[0][] }[] = [
+  type Tile = Parameters<typeof Metric>[0] & {
+    /** Recent values for this metric. Omitted where a trend is not meaningful. */
+    series?: (number | null)[];
+    higherIsWorse?: boolean;
+  };
+
+  const groups: { heading: string; metrics: Tile[] }[] = [
     {
       heading: "Road",
       metrics: [
@@ -66,16 +93,21 @@ export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: bool
           value: percent(kpis?.averageCongestion ?? null),
           unit: "% of capacity",
           level: riskStatus,
+          series: series.congestion,
         },
         {
           label: "Average speed",
           value: kpis?.averageSpeedKph ? Number(kpis.averageSpeedKph).toFixed(1) : null,
           unit: "km/h",
+          series: series.speed,
+          // Falling speed is the bad direction, unlike every other tile here.
+          higherIsWorse: false,
         },
         {
           label: "Vehicles",
           value: kpis?.totalVehicleCount != null ? formatNumber(kpis.totalVehicleCount) : null,
           unit: "in window",
+          series: series.vehicles,
         },
       ],
     },
@@ -91,6 +123,7 @@ export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: bool
           // claim the platform never saw one, which is false and reads as a
           // fault; the truth is that this window has none yet.
           absenceReason: "No reading this window",
+          series: series.aqi,
         },
         {
           label: "Weather",
@@ -163,11 +196,22 @@ export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: bool
               {group.heading}
             </h3>
             <div className="grid gap-4">
-              {group.metrics.map((metric) =>
+              {group.metrics.map(({ series: trend, higherIsWorse, ...metric }) =>
                 loading ? (
                   <Skeleton key={metric.label} className="h-9 w-24" />
                 ) : (
-                  <Metric key={metric.label} {...metric} />
+                  <div key={metric.label}>
+                    <Metric {...metric} />
+                    {/* Only when there is something to plot. An empty
+                        sparkline slot on every tile would be a row of
+                        placeholders pretending to be a chart. */}
+                    {trend && trend.filter((v) => v !== null).length >= 2 && (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <Sparkline points={trend} width={64} height={20} ariaLabel={`${metric.label} trend`} />
+                        <TrendBadge change={trendOf(trend)} higherIsWorse={higherIsWorse ?? true} />
+                      </div>
+                    )}
+                  </div>
                 ),
               )}
             </div>

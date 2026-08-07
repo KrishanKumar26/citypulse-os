@@ -85,6 +85,27 @@ public class TelemetryController {
     }
 
     /**
+     * A city's recent history as one aggregated series.
+     *
+     * <p>Separate from the per-zone endpoint above because the aggregation rule —
+     * average only across zones that reported — has to live in one place. Left
+     * to callers, every chart in the product would fold twenty zone series in
+     * the browser and each would drift from the snapshot's arithmetic in its own
+     * way.
+     */
+    @GetMapping("/by-slug/{slug}/history")
+    @Operation(summary = "A city's recent curated history, aggregated across its zones",
+            description = "Requires telemetry:read. Defaults to the last six hours.")
+    public ResponseEntity<ApiResponse<TelemetryResponses.CityHistory>> cityHistory(
+            @PathVariable String slug,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+        return ResponseEntity.ok(ApiResponse.ok(metricsService.cityHistory(slug, from, to)));
+    }
+
+    /**
      * Issues a one-minute, single-use ticket for opening a stream.
      *
      * <p>Needed because {@code EventSource} cannot send an {@code Authorization}

@@ -311,4 +311,63 @@ public class LiveMetricsService {
         return new TelemetryResponses.ZoneHistory(
                 zone.getUid().toString(), zone.getCode(), start, end, points.size(), points);
     }
+
+    /**
+     * A city's history as one series, for the charts on the dashboard.
+     *
+     * <p>The per-zone endpoint above cannot answer a city-level question without
+     * the caller fetching every zone and folding the results itself — twenty
+     * requests to draw one sparkline, and the aggregation rule reimplemented in
+     * the browser where it would drift from the one the snapshot uses.
+     *
+     * <p>That rule is the important part: averages are taken only across zones
+     * that reported in each window. A window nobody reported in is absent from
+     * the series rather than present as zero, so a chart drawn from this cannot
+     * show a gap in the feed as a quiet hour.
+     */
+    @Transactional(readOnly = true)
+    public TelemetryResponses.CityHistory cityHistory(String slug, Instant from, Instant to) {
+        City city = cityRepository.findBySlugAndDeletedAtIsNull(slug)
+                .orElseThrow(() -> new Exceptions.NotFound("City", slug));
+
+        Instant end = Optional.ofNullable(to).orElseGet(Instant::now);
+        Instant start = Optional.ofNullable(from)
+                .orElseGet(() -> end.minus(java.time.Duration.ofHours(6)));
+        if (!start.isBefore(end)) {
+            throw new Exceptions.BadRequest("'from' must be before 'to'");
+        }
+
+        List<Zone> zones = zoneRepository.findByCity(city.getId(), true);
+        if (zones.isEmpty()) {
+            return new TelemetryResponses.CityHistory(
+                    city.getUid().toString(), city.getSlug(), start, end, 0, 0, List.of());
+        }
+
+        List<Long> zoneIds = zones.stream().map(Zone::getId).toList();
+        List<TelemetryResponses.CityHistoryPoint> points = metricRepository
+                .findCityWindow(zoneIds, start, end,
+                        PageRequest.of(0, properties.maxHistoryWindows()))
+                .stream()
+                .map(row -> new TelemetryResponses.CityHistoryPoint(
+                        row.getWindowStart(),
+                        scaled(row.getOccupancyRatio(), 4),
+                        scaled(row.getAverageSpeedKph(), 2),
+                        // AVG over an integer column comes back as a double; a
+                        // fractional AQI is not a reading anyone quotes.
+                        row.getAqi() == null ? null : (int) Math.round(row.getAqi()),
+                        scaled(row.getRiskScore(), 2),
+                        row.getVehicleCount(),
+                        row.getActiveIncidents() == null ? null : row.getActiveIncidents().intValue(),
+                        row.getReportingZones() == null ? 0 : row.getReportingZones().intValue()))
+                .toList();
+
+        return new TelemetryResponses.CityHistory(
+                city.getUid().toString(), city.getSlug(), start, end,
+                points.size(), zones.size(), points);
+    }
+
+    /** Rounds an aggregate to the precision the column is stored at. */
+    private static BigDecimal scaled(BigDecimal value, int scale) {
+        return value == null ? null : value.setScale(scale, java.math.RoundingMode.HALF_UP);
+    }
 }

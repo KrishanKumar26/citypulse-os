@@ -1,5 +1,6 @@
 import { api } from "./client";
 import type {
+  CityHistory,
   AlertDetail,
   AlertStatus,
   AlertSummary,
@@ -98,6 +99,17 @@ export const liveApi = {
    * history and Referer headers. The ticket is the credential that is safe to
    * put in a query string because it is worthless a minute later.
    */
+  /** A city's aggregated series, for the dashboard's trends and sparklines. */
+  cityHistory: (citySlug: string, from?: string, to?: string) => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const query = params.toString();
+    return api.get<CityHistory>(
+      `/api/v1/live/by-slug/${citySlug}/history${query ? `?${query}` : ""}`,
+    );
+  },
+
   streamTicket: (citySlug: string) =>
     api.post<{ ticket: string; expiresInSeconds: number }>(
       `/api/v1/live/by-slug/${citySlug}/stream-ticket`,

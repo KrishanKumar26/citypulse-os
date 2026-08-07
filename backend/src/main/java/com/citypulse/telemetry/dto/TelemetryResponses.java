@@ -77,6 +77,39 @@ public final class TelemetryResponses {
      * presenting both as "the city average".
      */
     @Schema(description = "Aggregated conditions across a city's monitored zones")
+    /**
+     * One window of a city's history, aggregated across the zones that reported.
+     *
+     * <p>Every measurement is nullable. A window in which no zone reported air
+     * quality has no city AQI — not zero — and the same distinction the live
+     * snapshot makes has to survive into the series a chart is drawn from, or
+     * the chart draws a line through a gap and calls it data.
+     */
+    public record CityHistoryPoint(
+            Instant windowStart,
+            BigDecimal averageCongestion,
+            BigDecimal averageSpeedKph,
+            Integer averageAqi,
+            BigDecimal averageRiskScore,
+            Long totalVehicleCount,
+            Integer activeIncidents,
+            @Schema(description = "Zones that contributed to this window")
+            int reportingZones
+    ) {
+    }
+
+    public record CityHistory(
+            String cityId,
+            String citySlug,
+            Instant from,
+            Instant to,
+            int windows,
+            @Schema(description = "Zones monitored in this city, for reading the coverage of each window")
+            int zonesMonitored,
+            List<CityHistoryPoint> points
+    ) {
+    }
+
     public record CityKpis(
             BigDecimal averageCongestion,
             BigDecimal averageSpeedKph,

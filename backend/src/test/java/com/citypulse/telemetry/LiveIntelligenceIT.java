@@ -4,6 +4,7 @@ import com.citypulse.support.IntegrationTest;
 import com.citypulse.user.domain.RoleName;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -349,4 +350,87 @@ class LiveIntelligenceIT extends IntegrationTest {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/live/by-slug/" + BENGALURU + "/stream-ticket"))
                 .andExpect(status().isUnauthorized());
     }
+    // ------------------------------------------------------------------
+    // City history
+    // ------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("City history")
+    class CityHistoryTests {
+
+        @Test
+        @DisplayName("averages across the zones that reported in each window")
+        void aggregatesPerWindow() throws Exception {
+            Tokens tokens = loginAs("history-avg@example.com", RoleName.CITY_OPERATOR);
+            Instant window = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(10, ChronoUnit.MINUTES);
+
+            insertWindow("BLR-WHF", window, "0.80", "20.00", "HIGH", 200, "80.00", "HIGH", 1, 6);
+            insertWindow("BLR-KOR", window, "0.40", "40.00", "NORMAL", 100, "40.00", "NORMAL", 1, 6);
+
+            JsonNode body = objectMapper.readTree(mockMvc.perform(get("/api/v1/live/by-slug/bengaluru/history")
+                            .header("Authorization", "Bearer " + tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+
+            JsonNode point = body.path("data").path("points").get(0);
+            assertThat(point.path("averageCongestion").decimalValue())
+                    .isEqualByComparingTo(new java.math.BigDecimal("0.6000"));
+            assertThat(point.path("averageSpeedKph").decimalValue())
+                    .isEqualByComparingTo(new java.math.BigDecimal("30.00"));
+            assertThat(point.path("averageAqi").asInt()).isEqualTo(150);
+            assertThat(point.path("activeIncidents").asInt()).isEqualTo(2);
+
+            // The coverage of the average, so a caller can tell two zones from
+            // twenty. Without it every figure here is an unqualified claim.
+            assertThat(point.path("reportingZones").asInt()).isEqualTo(2);
+            assertThat(body.path("data").path("zonesMonitored").asInt()).isGreaterThanOrEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("a window nobody reported in is absent, not zero")
+        void silentWindowsAreOmitted() throws Exception {
+            Tokens tokens = loginAs("history-gap@example.com", RoleName.CITY_OPERATOR);
+            Instant older = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(30, ChronoUnit.MINUTES);
+            Instant newer = older.plus(20, ChronoUnit.MINUTES);
+
+            // Nothing at all between these two, which is what a stopped feed
+            // looks like in the curated table.
+            insertWindow("BLR-WHF", older, "0.50", "35.00", "MODERATE", 120, "45.00", "MODERATE", 0, 6);
+            insertWindow("BLR-WHF", newer, "0.90", "15.00", "CRITICAL", 260, "88.00", "CRITICAL", 2, 6);
+
+            JsonNode body = objectMapper.readTree(mockMvc.perform(get("/api/v1/live/by-slug/bengaluru/history")
+                            .header("Authorization", "Bearer " + tokens.accessToken()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+
+            JsonNode points = body.path("data").path("points");
+            assertThat(points).hasSize(2);
+
+            // A zero-filled gap would draw as a plunge to nothing and back — a
+            // stopped pipeline rendered as a sudden, dramatic improvement.
+            for (JsonNode point : points) {
+                assertThat(point.path("averageCongestion").decimalValue())
+                        .isGreaterThan(java.math.BigDecimal.ZERO);
+            }
+        }
+
+        @Test
+        @DisplayName("rejects a range that ends before it starts")
+        void rejectsInvertedRange() throws Exception {
+            Tokens tokens = loginAs("history-range@example.com", RoleName.CITY_OPERATOR);
+            mockMvc.perform(get("/api/v1/live/by-slug/bengaluru/history")
+                            .param("from", "2026-08-07T12:00:00Z")
+                            .param("to", "2026-08-07T11:00:00Z")
+                            .header("Authorization", "Bearer " + tokens.accessToken()))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("requires authentication")
+        void requiresAuth() throws Exception {
+            mockMvc.perform(get("/api/v1/live/by-slug/bengaluru/history"))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
 }

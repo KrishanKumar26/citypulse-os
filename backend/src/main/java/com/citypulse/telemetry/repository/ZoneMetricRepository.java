@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -71,6 +72,52 @@ public interface ZoneMetricRepository extends JpaRepository<ZoneMetric, Long> {
                                 @Param("from") Instant from,
                                 @Param("to") Instant to,
                                 Pageable pageable);
+
+    /**
+     * A city's history, one row per window, aggregated across its zones.
+     *
+     * <p>Aggregated in SQL rather than by fetching every zone's windows and
+     * folding them in Java: six hours of a twenty-zone city is 1,440 rows to
+     * transfer and discard, and the same figures the database can produce in one
+     * pass.
+     *
+     * <p>The averages ignore nulls, which is what AVG does and what is wanted —
+     * a zone that reported traffic but no air quality should not drag the city's
+     * AQI toward zero. {@code reportingZones} counts the zones that contributed,
+     * so a caller can tell an average over three zones from one over twenty.
+     */
+    @Query("""
+            SELECT m.windowStart                AS windowStart,
+                   AVG(m.occupancyRatio)        AS occupancyRatio,
+                   AVG(m.averageSpeedKph)       AS averageSpeedKph,
+                   AVG(m.aqi)                   AS aqi,
+                   AVG(m.riskScore)             AS riskScore,
+                   SUM(m.vehicleCount)          AS vehicleCount,
+                   SUM(m.activeIncidents)       AS activeIncidents,
+                   COUNT(m.id)                  AS reportingZones
+            FROM ZoneMetric m
+            WHERE m.zoneId IN :zoneIds
+              AND m.windowStart >= :from
+              AND m.windowStart < :to
+            GROUP BY m.windowStart
+            ORDER BY m.windowStart ASC
+            """)
+    List<CityHistoryRow> findCityWindow(@Param("zoneIds") List<Long> zoneIds,
+                                        @Param("from") Instant from,
+                                        @Param("to") Instant to,
+                                        Pageable pageable);
+
+    /** Projection for {@link #findCityWindow}. */
+    interface CityHistoryRow {
+        Instant getWindowStart();
+        BigDecimal getOccupancyRatio();
+        BigDecimal getAverageSpeedKph();
+        Double getAqi();
+        BigDecimal getRiskScore();
+        Long getVehicleCount();
+        Long getActiveIncidents();
+        Long getReportingZones();
+    }
 
     /**
      * The newest window boundary anywhere in a city.
