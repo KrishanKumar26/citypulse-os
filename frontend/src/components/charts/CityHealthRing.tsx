@@ -162,10 +162,10 @@ function Contributions({ kpis }: { kpis: CityKpis | null }) {
     {
       label: "Incidents",
       value:
-        kpis && kpis.zonesMonitored > 0
+        kpis?.activeIncidents != null && kpis.zonesMonitored > 0
           ? Math.min((kpis.activeIncidents / kpis.zonesMonitored) * 100, 100)
           : null,
-      suffix: kpis ? `${kpis.activeIncidents} active` : "",
+      suffix: kpis?.activeIncidents != null ? `${kpis.activeIncidents} active` : "",
     },
   ];
 

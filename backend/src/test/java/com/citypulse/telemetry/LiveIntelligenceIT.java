@@ -179,6 +179,19 @@ class LiveIntelligenceIT extends IntegrationTest {
         assertThat(snapshot.path("stale").asBoolean()).isTrue();
         assertThat(notMeasured(snapshot, "asOf")).isTrue();
         assertThat(snapshot.path("kpis").path("zonesReporting").asInt()).isZero();
+
+        // The distinction the comment above claims, actually asserted. It was
+        // not, and the counts came back as 0 — so a deployment whose every feed
+        // had stopped rendered "0 active incidents" and read as a calm evening.
+        // Summed from the reporting zones, an empty sum is not a measurement.
+        JsonNode kpis = snapshot.path("kpis");
+        assertThat(notMeasured(kpis, "activeIncidents")).isTrue();
+        assertThat(notMeasured(kpis, "activeEvents")).isTrue();
+
+        // Open alerts are counted from the alerts table, which needs no recent
+        // window, so zero there is a genuine measurement and stays a number.
+        assertThat(kpis.hasNonNull("activeAlerts")).isTrue();
+        assertThat(kpis.path("activeAlerts").asInt()).isZero();
     }
 
     @Test

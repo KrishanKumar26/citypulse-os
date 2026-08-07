@@ -224,8 +224,14 @@ public class LiveMetricsService {
                         .map(TelemetryResponses.ZoneCondition::weatherCondition)
                         .filter(java.util.Objects::nonNull)
                         .findFirst().orElse(null),
-                reporting.stream().mapToInt(TelemetryResponses.ZoneCondition::activeIncidents).sum(),
-                reporting.stream().mapToInt(TelemetryResponses.ZoneCondition::activeEvents).sum(),
+                // Null rather than 0 when nothing reported — see CityKpis. The
+                // averages above already exclude silent zones for the same
+                // reason; these two were summing over an empty list and
+                // presenting the result as a measurement.
+                reporting.isEmpty() ? null
+                        : reporting.stream().mapToInt(TelemetryResponses.ZoneCondition::activeIncidents).sum(),
+                reporting.isEmpty() ? null
+                        : reporting.stream().mapToInt(TelemetryResponses.ZoneCondition::activeEvents).sum(),
                 openAlerts,
                 avgRisk,
                 bandOf(avgRisk),

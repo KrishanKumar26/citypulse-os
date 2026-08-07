@@ -106,8 +106,12 @@ export function KpiRow({ kpis, loading }: { kpis: CityKpis | null; loading: bool
       metrics: [
         {
           label: "Active incidents",
-          value: kpis ? String(kpis.activeIncidents) : null,
-          level: kpis && kpis.activeIncidents > 0 ? "moderate" : "neutral",
+          // Not `kpis ? ... : null` — the count itself is nullable now. A city
+          // whose feeds have all stopped reported "0 incidents", which reads as
+          // a calm evening rather than as a blind one.
+          value: kpis?.activeIncidents != null ? String(kpis.activeIncidents) : null,
+          level: kpis?.activeIncidents ? "moderate" : "neutral",
+          absenceReason: "No zone reporting",
         },
         {
           label: "Open alerts",

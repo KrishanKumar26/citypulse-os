@@ -268,10 +268,12 @@ and similar have free tiers) does the same job without spending it.
 
 **There is no live pipeline.** Kafka and Spark have no free tier worth the name.
 `refresh-demo-data.yml` runs the generator and the local pipeline runner every
-six hours instead — the same validation, windowing and load path, driven on a
-schedule rather than by a stream. Between runs the data ages, and the dashboard
-says so: a window older than two hours is marked stale, which is correct
-behaviour rather than a bug to hide.
+hour instead — the same validation, windowing and load path, driven on a
+schedule rather than by a stream. Between runs the data ages, and the dashboard says so: a window older than
+fifteen minutes is marked stale, which is correct behaviour rather than a bug to
+hide. The cadence is set by the backend's `telemetry.max-age` of two hours —
+beyond that a window is not current at all and the API reports nothing, so a
+six-hourly refresh left the dashboard blind for four hours in six.
 
 **Neon's compute suspends when idle** and resumes in a few hundred milliseconds.
 Noticeable on the first query, not after.

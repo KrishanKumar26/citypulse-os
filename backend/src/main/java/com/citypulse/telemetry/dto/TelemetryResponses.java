@@ -85,8 +85,18 @@ public final class TelemetryResponses {
             BigDecimal temperatureC,
             BigDecimal precipitationMmH,
             String weatherCondition,
-            int activeIncidents,
-            int activeEvents,
+
+            // Nullable, unlike activeAlerts below. These are summed from the
+            // zones that reported; when none did, the honest answer is "not
+            // known", not zero. Returned as 0 they rendered a city whose every
+            // feed had stopped as a city with no incidents — a dead pipeline
+            // presented as a calm evening, which is the most dangerous
+            // direction for this dashboard to be wrong.
+            Integer activeIncidents,
+            Integer activeEvents,
+
+            // Not nullable: open alerts are counted from the alerts table, which
+            // does not depend on a recent window. Zero here is a measurement.
             int activeAlerts,
             BigDecimal averageRiskScore,
             String overallRiskLevel,

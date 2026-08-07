@@ -10,10 +10,20 @@
 # database, which is the same validation, windowing and load path the streaming
 # job uses — see docs/DATA_PIPELINE.md §1.
 #
-# Budget: a private repository gets 2,000 free Actions minutes a month. Every
-# six hours is 120 runs at roughly three minutes — about 360 minutes, leaving
-# room for CI. A ten-minute keep-warm ping would alone cost more than the whole
-# allowance, which is why there is no keep-warm job; the cold start is
+# Cadence is set by the backend, not by taste. `telemetry.max-age` is PT2H:
+# beyond that a window is not "current" at all and the API reports zero zones
+# reporting. Running every six hours therefore left the dashboard blind for four
+# hours in every six — and blind did not look blank, it looked calm, because the
+# incident and event counts came back as 0. That is the single most dangerous
+# way this product can be wrong, and it was live.
+#
+# Hourly keeps the newest window an hour old at worst, an hour inside max-age.
+#
+# Budget: a private repository gets 2,000 free Actions minutes a month. Measured
+# rather than assumed — recent runs take 15 to 60 seconds, not the three minutes
+# this comment used to claim. Hourly is 720 runs at ~1 minute, leaving roughly
+# 1,200 minutes for CI. A ten-minute keep-warm ping would still cost more than
+# the whole allowance, which is why there is no keep-warm job; the cold start is
 # documented in docs/DEPLOYMENT.md instead.
 # =============================================================================
 
@@ -21,13 +31,13 @@ name: Refresh demo data
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       hours:
         description: "Hours of telemetry to generate"
         required: false
-        default: "8"
+        default: "3"
 
 concurrency:
   group: refresh-demo-data
@@ -79,7 +89,7 @@ jobs:
         env:
           CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
         run: |
-          HOURS="${{ inputs.hours || '8' }}"
+          HOURS="${{ inputs.hours || '3' }}"
           FROM=$(date -u -d "$HOURS hours ago" +%Y-%m-%dT%H:%M:%SZ)
           TO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 

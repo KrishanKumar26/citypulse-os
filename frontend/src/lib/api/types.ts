@@ -183,8 +183,10 @@ export interface CityKpis {
   temperatureC: string | null;
   precipitationMmH: string | null;
   weatherCondition: string | null;
-  activeIncidents: number;
-  activeEvents: number;
+  /** Null when no zone reported — summed from windows, so absent is not zero. */
+  activeIncidents: number | null;
+  activeEvents: number | null;
+  /** Counted from the alerts table, which needs no recent window: zero is real. */
   activeAlerts: number;
   averageRiskScore: string | null;
   overallRiskLevel: ConditionLevel | null;
