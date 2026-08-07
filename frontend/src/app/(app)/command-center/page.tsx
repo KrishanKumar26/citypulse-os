@@ -23,6 +23,7 @@ import type { Zone, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
 import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
 import { KpiRow } from "@/components/live/KpiRow";
+import { SituationFeed } from "@/components/live/SituationFeed";
 import { RiskDistribution, ZoneRiskChart } from "@/components/charts/ZoneRiskChart";
 import { ZoneIntelligence } from "@/components/live/ZoneIntelligence";
 import { ZoneTable } from "@/components/live/ZoneTable";
@@ -107,6 +108,29 @@ export default function CommandCenterPage() {
           status={status}
           lastEventAt={lastEventAt}
           onReconnect={reconnect}
+        />
+      </div>
+
+      {/*
+        What needs attention, before what the numbers are.
+
+        The page used to open with twelve metric tiles. An operator arriving
+        mid-shift had to read the whole row and compare each figure against a
+        sense of normal they were expected to already hold, to work out where to
+        look. The feed answers that directly, from anomalies the platform has
+        already detected against each zone's own baseline.
+
+        The metrics stay, underneath — they are the context for a situation, not
+        a substitute for one.
+      */}
+      <div className="mb-5">
+        <SituationFeed
+          city={city}
+          conditions={conditions}
+          onInvestigate={(zoneId) => {
+            const zone = zones.find((z) => z.id === zoneId);
+            if (zone) setSelectedZone(zone);
+          }}
         />
       </div>
 

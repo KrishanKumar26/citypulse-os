@@ -39,6 +39,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
     heading: "Intelligence",
     items: [
       { label: "AI Insights", href: "/insights", icon: "sparkle", available: true },
+      { label: "Anomaly Detection", href: "/anomalies", icon: "pulse", available: true },
       { label: "Forecast", href: "/forecast", icon: "trending", available: true },
       { label: "What-If Simulator", href: "/simulator", icon: "beaker", available: true },
       { label: "Digital Twin", href: "/digital-twin", icon: "layers", available: false },
@@ -156,6 +157,7 @@ function NavIcon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     grid: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
     activity: "M3 12h4l3-8 4 16 3-8h4",
+    pulse: "M3 12h3l2-4 3 9 3-14 2 9h5",
     trending: "M3 17l6-6 4 4 8-8M17 7h4v4",
     beaker: "M9 3v6L4 19a2 2 0 002 2h12a2 2 0 002-2l-5-10V3M8 3h8",
     sparkle: "M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z",
