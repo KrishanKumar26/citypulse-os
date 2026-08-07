@@ -1,5 +1,6 @@
 import { api } from "./client";
 import type {
+  DataSourceList,
   CityHistory,
   AlertDetail,
   AlertStatus,
@@ -65,6 +66,10 @@ export const geoApi = {
     api.get<Zone[]>(`/api/v1/cities/${cityId}/zones?activeOnly=${activeOnly}`),
 
   getZone: (zoneId: string) => api.get<Zone>(`/api/v1/zones/${zoneId}`),
+};
+
+export const dataSourceApi = {
+  list: () => api.get<DataSourceList>("/api/v1/data-sources"),
 };
 
 export const platformApi = {

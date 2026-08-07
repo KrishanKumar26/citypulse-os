@@ -1,23 +1,193 @@
-import { ComingSoon } from "@/components/ui";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { Badge, Card, CardHeader, EmptyState, ErrorState, LoadingState, cn } from "@/components/ui";
+import { dataSourceApi } from "@/lib/api/endpoints";
+import type { DataSourceSummary } from "@/lib/api/types";
 
 /**
- * Data Sources is not implemented yet.
+ * Where the numbers came from.
  *
- * The route exists so navigation never dead-ends, and states plainly what is
- * missing rather than presenting controls that do nothing (PRD §30 of the
- * execution prompt).
+ * Every other page in the product presents derived figures. This is the one
+ * that says what fed them, and whether those feeds are actually running — which
+ * is the question behind "why is the dashboard empty", and until now had no
+ * answer inside the product at all.
+ *
+ * The column that matters is rows delivered, not status. A source's status is a
+ * configuration and its last-ingested timestamp is written by whatever writes
+ * the events, so a retry can advance it without a row arriving. Counting rows
+ * cannot be wrong in that direction, and where the two disagree the count is the
+ * measurement and the rest is a claim.
  */
+
+const TYPE_LABEL: Record<string, string> = {
+  TRAFFIC: "Traffic",
+  WEATHER: "Weather",
+  AIR_QUALITY: "Air quality",
+  INCIDENT: "Incidents",
+  CITY_EVENT: "City events",
+};
+
+function relativeAge(seconds: number | null): string {
+  if (seconds === null) return "never";
+  if (seconds < 90) return `${Math.max(seconds, 0)}s ago`;
+  if (seconds < 5400) return `${Math.round(seconds / 60)}m ago`;
+  if (seconds < 172800) return `${Math.round(seconds / 3600)}h ago`;
+  return `${Math.round(seconds / 86400)}d ago`;
+}
+
 export default function DataSourcesPage() {
+  const query = useQuery({
+    queryKey: ["data-sources"],
+    queryFn: () => dataSourceApi.list(),
+    refetchInterval: 60_000,
+  });
+
+  const data = query.data;
+
   return (
-    <ComingSoon
-      module="Data Sources"
-      phase="Phase 3"
-      capabilities={[
-        "Registered ingestion sources and their health",
-        "Kafka topic throughput and consumer lag",
-        "Data quality metrics: missing values, duplicates and range violations",
-        "Dead letter queue inspection with reason codes",
-      ]}
-    />
+    <div className="space-y-5 p-5">
+      <header>
+        <h1 className="text-lg font-semibold tracking-tight">Data Sources</h1>
+        <p className="mt-1 text-[13px] text-content-tertiary">
+          The feeds behind every figure in the product, and whether they are delivering.
+        </p>
+      </header>
+
+      {query.isError ? (
+        <ErrorState
+          title="Could not load sources"
+          message={query.error instanceof Error ? query.error.message : "Unavailable."}
+          onRetry={() => void query.refetch()}
+        />
+      ) : query.isLoading ? (
+        <LoadingState label="Loading sources" rows={5} />
+      ) : !data || data.sources.length === 0 ? (
+        <EmptyState
+          title="No sources configured"
+          description="Nothing is registered to ingest from. Migration V5 seeds the synthetic feeds."
+        />
+      ) : (
+        <>
+          <div className="grid gap-px overflow-hidden rounded-lg border border-line-subtle bg-line-subtle sm:grid-cols-3">
+            <Tile label="Registered" value={String(data.total)} />
+            <Tile label="Active" value={String(data.active)} />
+            <Tile
+              label="Silent"
+              value={String(data.silent)}
+              // Only coloured when it is non-zero. A permanent red "0" trains
+              // the reader to stop looking at it.
+              level={data.silent > 0 ? "high" : undefined}
+              note={data.silent > 0 ? `active, nothing in ${data.windowHours}h` : "all active feeds delivering"}
+            />
+          </div>
+
+          <Card className="overflow-hidden">
+            <CardHeader
+              title="Feeds"
+              description={`Row counts are measured over the last ${data.windowHours} hours from the event tables, not read from each source's own timestamp.`}
+            />
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[12.5px]">
+                <thead>
+                  <tr className="border-b border-line-subtle text-[11px] text-content-tertiary">
+                    <th scope="col" className="px-4 py-2.5 font-medium">Source</th>
+                    <th scope="col" className="px-4 py-2.5 font-medium">Type</th>
+                    <th scope="col" className="px-4 py-2.5 font-medium">Mode</th>
+                    <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
+                    <th scope="col" className="px-4 py-2.5 text-right font-medium">
+                      Rows / {data.windowHours}h
+                    </th>
+                    <th scope="col" className="px-4 py-2.5 text-right font-medium">Last delivery</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.sources.map((source) => (
+                    <Row key={source.id} source={source} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <p className="text-[11.5px] leading-relaxed text-content-tertiary">
+            Every feed here is synthetic, and labelled so. That is the platform&rsquo;s design
+            rather than a gap: it runs with no external API, so the pipeline, the models and the
+            dashboard can be exercised end to end without depending on a third party&rsquo;s
+            availability or terms. Nothing on this page is presented as a real municipal feed.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Row({ source }: { source: DataSourceSummary }) {
+  const paused = source.status !== "ACTIVE";
+  return (
+    <tr className="border-b border-line-subtle last:border-0 hover:bg-surface-hover">
+      <td className="px-4 py-2.5">
+        <span className="block text-content-primary">{source.name}</span>
+        <span className="text-[10.5px] text-content-tertiary">{source.code}</span>
+      </td>
+      <td className="px-4 py-2.5 text-content-secondary">
+        {TYPE_LABEL[source.sourceType] ?? source.sourceType}
+      </td>
+      <td className="px-4 py-2.5">
+        <span className="text-content-secondary">{source.ingestionMode.toLowerCase()}</span>
+      </td>
+      <td className="px-4 py-2.5">
+        {source.silent ? (
+          // The distinction the page exists for: running by configuration,
+          // not running in fact.
+          <Badge level="high">Silent</Badge>
+        ) : paused ? (
+          <Badge level="neutral">{source.status.toLowerCase()}</Badge>
+        ) : (
+          <Badge level="normal">Delivering</Badge>
+        )}
+      </td>
+      <td className={cn("px-4 py-2.5 text-right tabular",
+        source.rowsInWindow === 0 ? "text-content-disabled" : "text-content-primary")}>
+        {source.rowsInWindow.toLocaleString()}
+      </td>
+      <td className="px-4 py-2.5 text-right text-content-secondary">
+        {source.lastIngestedAt === null ? (
+          // "never" and "a long time ago" are different problems.
+          <span className="text-content-disabled">never</span>
+        ) : (
+          relativeAge(source.secondsSinceLastIngest)
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function Tile({
+  label,
+  value,
+  note,
+  level,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  level?: "high";
+}) {
+  return (
+    <div className="bg-surface-raised px-5 py-4">
+      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-content-tertiary">
+        {label}
+      </div>
+      <div
+        className={cn(
+          "mt-1 tabular text-[22px] font-semibold leading-none",
+          level === "high" ? "text-status-high" : "text-content-primary",
+        )}
+      >
+        {value}
+      </div>
+      {note && <div className="mt-1.5 text-[11px] text-content-tertiary">{note}</div>}
+    </div>
   );
 }

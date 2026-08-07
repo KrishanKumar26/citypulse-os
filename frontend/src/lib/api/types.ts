@@ -617,3 +617,29 @@ export interface InsightsSummary {
   currentSituation: MemoryRecall | null;
   baselineBuckets: number;
 }
+
+export interface DataSourceSummary {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  sourceType: string;
+  ingestionMode: string;
+  status: string;
+  /** Null means never delivered — a different problem from delivered long ago. */
+  lastIngestedAt: string | null;
+  secondsSinceLastIngest: number | null;
+  /** Counted from the event tables, not read from lastIngestedAt. */
+  rowsInWindow: number;
+  /** ACTIVE but delivering nothing: configured to run and not running. */
+  silent: boolean;
+  demoData: boolean;
+}
+
+export interface DataSourceList {
+  windowHours: number;
+  total: number;
+  active: number;
+  silent: number;
+  sources: DataSourceSummary[];
+}
