@@ -14,8 +14,6 @@ import {
 import {
   CONDITION_COLORS,
   NO_DATA_COLOR,
-  ZONE_TYPE_COLORS,
-  ZONE_TYPE_LABELS,
 } from "@/components/map/ZoneMap";
 import { geoApi } from "@/lib/api/endpoints";
 import type { Zone, ZoneCondition } from "@/lib/api/types";
@@ -24,8 +22,9 @@ import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
 import { KpiRow } from "@/components/live/KpiRow";
 import { RiskDistribution, ZoneRiskChart } from "@/components/charts/ZoneRiskChart";
 import { ZoneIntelligence } from "@/components/live/ZoneIntelligence";
+import { ZoneTable } from "@/components/live/ZoneTable";
 import { LiveStatusBar } from "@/components/live/LiveStatusBar";
-import { formatArea, formatNumber } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
 
 // Leaflet touches window at import time, so the map is loaded client-side only.
 const ZoneMap = dynamic(() => import("@/components/map/ZoneMap"), {
@@ -182,6 +181,7 @@ export default function CommandCenterPage() {
       <div className="mt-5">
         <ZoneTable
           zones={zones}
+          conditions={conditions}
           loading={zonesQuery.isLoading}
           selectedZoneId={selectedZone?.id ?? null}
           onSelectZone={setSelectedZone}
@@ -267,85 +267,5 @@ function ConditionLegend() {
         </div>
       ))}
     </div>
-  );
-}
-
-function ZoneTable({
-  zones,
-  loading,
-  selectedZoneId,
-  onSelectZone,
-}: {
-  zones: Zone[];
-  loading: boolean;
-  selectedZoneId: string | null;
-  onSelectZone: (zone: Zone) => void;
-}) {
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader title="Zones" description="All active monitored zones in the selected city." />
-
-      {loading ? (
-        <LoadingState label="Loading zones" rows={5} />
-      ) : zones.length === 0 ? (
-        <EmptyState title="No zones" description="This city has no active zones." />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-line-subtle text-[12px] text-content-tertiary">
-                <th scope="col" className="px-5 py-2.5 font-medium">Zone</th>
-                <th scope="col" className="px-5 py-2.5 font-medium">Code</th>
-                <th scope="col" className="px-5 py-2.5 font-medium">Type</th>
-                <th scope="col" className="px-5 py-2.5 text-right font-medium">Capacity</th>
-                <th scope="col" className="px-5 py-2.5 text-right font-medium">Population</th>
-                <th scope="col" className="px-5 py-2.5 text-right font-medium">Area</th>
-              </tr>
-            </thead>
-            <tbody>
-              {zones.map((zone) => (
-                <tr
-                  key={zone.id}
-                  onClick={() => onSelectZone(zone)}
-                  // Rows are focusable and activate on Enter, so the table is
-                  // usable without a pointer.
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onSelectZone(zone);
-                    }
-                  }}
-                  aria-selected={zone.id === selectedZoneId}
-                  className={`cursor-pointer border-b border-line-subtle transition-colors last:border-0 ${
-                    zone.id === selectedZoneId ? "bg-accent-subtle" : "hover:bg-surface-hover"
-                  }`}
-                >
-                  <td className="px-5 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: ZONE_TYPE_COLORS[zone.zoneType] }}
-                        aria-hidden="true"
-                      />
-                      {zone.name}
-                    </div>
-                  </td>
-                  <td className="px-5 py-2.5 font-mono text-[12px] text-content-tertiary">{zone.code}</td>
-                  <td className="px-5 py-2.5 text-content-secondary">{ZONE_TYPE_LABELS[zone.zoneType]}</td>
-                  <td className="px-5 py-2.5 text-right tabular">
-                    {zone.roadCapacityVph ? formatNumber(zone.roadCapacityVph) : "—"}
-                  </td>
-                  <td className="px-5 py-2.5 text-right tabular">
-                    {zone.population ? formatNumber(zone.population) : "—"}
-                  </td>
-                  <td className="px-5 py-2.5 text-right tabular">{formatArea(zone.areaSqKm)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
   );
 }

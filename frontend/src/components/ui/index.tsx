@@ -85,15 +85,25 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
   hint?: string;
+  /** Keeps the label for assistive technology while hiding it visually. */
+  hideLabel?: boolean;
 }
 
-export function Input({ label, error, hint, id, className, ...props }: InputProps) {
+export function Input({ label, error, hint, id, className, hideLabel, ...props }: InputProps) {
   const inputId = id ?? `field-${label.toLowerCase().replace(/\s+/g, "-")}`;
   const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={inputId} className="block text-[13px] font-medium text-content-secondary">
+      {/* Hidden visually, never removed. A search box in a toolbar has no room
+          for a caption, but dropping the label would leave a screen reader with
+          an unnamed field — so it is moved off-screen rather than deleted. */}
+      <label
+        htmlFor={inputId}
+        className={cn(
+          hideLabel ? "sr-only" : "block text-[13px] font-medium text-content-secondary",
+        )}
+      >
         {label}
       </label>
       <input
