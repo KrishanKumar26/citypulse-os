@@ -54,3 +54,15 @@ describe("severity colours", () => {
     expect(new Set(values).size).toBe(4);
   });
 });
+
+describe("theme-color", () => {
+  it("matches the base surface", () => {
+    // The browser paints its chrome with this before any CSS loads, so it is a
+    // literal rather than a token — and therefore the one value that can fall
+    // out of step with the palette without anything looking broken in the app.
+    const layout = readFileSync(join(ROOT, "app", "layout.tsx"), "utf8");
+    const declared = layout.match(/themeColor:\s*"(#[0-9a-fA-F]{3,8})"/);
+    expect(declared).not.toBeNull();
+    expect(declared![1].toLowerCase()).toBe(tokenValue("--color-surface-base"));
+  });
+});

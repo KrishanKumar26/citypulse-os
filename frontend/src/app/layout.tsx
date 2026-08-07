@@ -22,7 +22,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#08090c",
+  // Must equal --color-surface-base. It is the one colour that cannot be a
+  // token: the browser paints its chrome with it before any stylesheet loads.
+  // It was left at the old near-black through the palette change, so the phone
+  // status bar sat a shade off the page it framed — pinned by a test now.
+  themeColor: "#080b14",
   width: "device-width",
   initialScale: 1,
 };
