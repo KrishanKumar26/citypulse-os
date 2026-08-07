@@ -87,5 +87,19 @@ services:
       #
       # SerialGC rather than G1: on a single shared core, G1's background
       # threads cost more than they return.
-      - key: JAVA_TOOL_OPTIONS
-        value: "-Xmx300m -Xms128m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m"
+      #
+      # JAVA_OPTS, not JAVA_TOOL_OPTIONS. The Dockerfile's ENTRYPOINT expands
+      # JAVA_OPTS, so setting it here *replaces* the image's defaults, which is
+      # what is wanted. JAVA_TOOL_OPTIONS is *appended* to whatever the command
+      # line already carries — and the image already sets -XX:+UseG1GC, so the
+      # first deploy died before Spring even started:
+      #
+      #     Error occurred during initialization of VM
+      #     Multiple garbage collectors selected
+      #
+      # ExitOnOutOfMemoryError is carried over from the image deliberately. A
+      # JVM that has exhausted a 512 MB instance will not recover, and dying
+      # lets Render restart it instead of leaving a process that answers the
+      # health check while failing every request.
+      - key: JAVA_OPTS
+        value: "-Xmx300m -Xms128m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError"
