@@ -10,10 +10,13 @@ import {
   ErrorState,
   LoadingState,
   Skeleton,
+  cn,
 } from "@/components/ui";
 import {
   CONDITION_COLORS,
+  MAP_LAYERS,
   NO_DATA_COLOR,
+  type MapLayer,
 } from "@/components/map/ZoneMap";
 import { geoApi, liveApi } from "@/lib/api/endpoints";
 import type { Zone, ZoneCondition } from "@/lib/api/types";
@@ -47,6 +50,7 @@ const ZoneMap = dynamic(() => import("@/components/map/ZoneMap"), {
 export default function CommandCenterPage() {
   const { city } = useSelectedCity();
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
+  const [layer, setLayer] = useState<MapLayer>("risk");
 
   const zonesQuery = useQuery({
     queryKey: ["zones", city?.id],
@@ -120,9 +124,35 @@ export default function CommandCenterPage() {
         <Card className="overflow-hidden lg:col-span-2">
           <CardHeader
             title="City map"
-            description="Marker size is road capacity; colour is measured composite risk. Grey means the zone reported nothing recently."
+            description={
+              `Marker size is road capacity; colour is ${
+                MAP_LAYERS.find((l) => l.id === layer)!.legend.toLowerCase()
+              }. Grey means no reading for this layer.`
+            }
+            action={
+              <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Map layer">
+                {/* Radius stays capacity on every layer — two channels changing
+                    at once would leave a reader unable to tell which moved. */}
+                {MAP_LAYERS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setLayer(option.id)}
+                    aria-pressed={layer === option.id}
+                    className={cn(
+                      "rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                      layer === option.id
+                        ? "border-accent/40 bg-accent-subtle text-accent"
+                        : "border-line-default text-content-secondary hover:bg-surface-hover hover:text-content-primary",
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            }
           />
-          <div className="h-[460px]">
+          <div className="h-[560px]">
             {zonesQuery.isLoading ? (
               <div className="skeleton h-full w-full" />
             ) : zonesQuery.isError ? (
@@ -144,6 +174,7 @@ export default function CommandCenterPage() {
               <ZoneMap
                 city={city}
                 zones={zones}
+                layer={layer}
                 conditions={conditions}
                 selectedZoneId={selectedZone?.id ?? null}
                 onSelectZone={setSelectedZone}

@@ -89,6 +89,64 @@ function resolveConditionColors(): Record<ConditionLevel, string> {
 
 const CONDITION_COLORS: Record<ConditionLevel, string> = resolveConditionColors();
 
+/**
+ * What the marker colour means.
+ *
+ * The map encoded exactly one thing — composite risk — so a reader asking "where
+ * is the air worst?" had to leave it and read the table. Each layer keeps the
+ * same geometry and re-encodes colour, which is the cheapest possible way to
+ * answer a different question about the same places.
+ *
+ * Radius stays road capacity in every layer. Two channels changing at once would
+ * make it impossible to tell which one moved.
+ */
+export type MapLayer = "risk" | "traffic" | "incidents" | "air";
+
+export const MAP_LAYERS: { id: MapLayer; label: string; legend: string }[] = [
+  { id: "risk", label: "Risk", legend: "Measured composite risk" },
+  { id: "traffic", label: "Traffic", legend: "Share of road capacity in use" },
+  { id: "incidents", label: "Incidents", legend: "Active incidents in the zone" },
+  { id: "air", label: "Air quality", legend: "Air quality index" },
+];
+
+/**
+ * Colour for a zone under the chosen layer, or null when it has no reading for
+ * that layer specifically.
+ *
+ * Null is not the same as a zone with no telemetry at all: a zone reporting
+ * traffic but no air quality is grey on the air layer and coloured on the
+ * others, which is exactly what the reader should see.
+ */
+export function colorForLayer(layer: MapLayer, condition: ZoneCondition): string | null {
+  const band = (value: number, thresholds: [number, number, number]): string =>
+    value >= thresholds[2] ? CONDITION_COLORS.CRITICAL
+      : value >= thresholds[1] ? CONDITION_COLORS.HIGH
+      : value >= thresholds[0] ? CONDITION_COLORS.MODERATE
+      : CONDITION_COLORS.NORMAL;
+
+  switch (layer) {
+    case "risk":
+      return condition.riskLevel ? CONDITION_COLORS[condition.riskLevel] : null;
+    case "traffic":
+      // The pipeline's own classification, not a re-banding of the ratio. The
+      // first attempt here restated the thresholds from common/transforms.py
+      // and got them wrong — 0.6/0.85 against the real 0.55/0.80 — which would
+      // have coloured a band of zones one level calmer than the table beside
+      // them said they were. congestion_level is computed once, upstream, and
+      // travels with the reading.
+      return condition.congestionLevel
+        ? CONDITION_COLORS[condition.congestionLevel as ConditionLevel]
+        : null;
+    case "incidents":
+      return condition.activeIncidents === 0
+        ? CONDITION_COLORS.NORMAL
+        : band(condition.activeIncidents, [1, 2, 4]);
+    case "air":
+      // CPCB AQI bands: satisfactory / moderate / poor / very poor upward.
+      return condition.aqi === null ? null : band(condition.aqi, [100, 200, 300]);
+  }
+}
+
 const NO_DATA_COLOR = "#6b7a94";
 
 export { CONDITION_COLORS, NO_DATA_COLOR };
@@ -96,6 +154,8 @@ export { CONDITION_COLORS, NO_DATA_COLOR };
 interface ZoneMapProps {
   city: City;
   zones: Zone[];
+  /** Which measurement colour encodes. Defaults to risk, the map's original. */
+  layer?: MapLayer;
   selectedZoneId: string | null;
   onSelectZone: (zone: Zone) => void;
   /**
@@ -113,6 +173,7 @@ interface ZoneMapProps {
 export default function ZoneMap({
   city,
   zones,
+  layer = "risk",
   selectedZoneId,
   onSelectZone,
   conditions,
@@ -147,8 +208,8 @@ export default function ZoneMap({
         // Silent zones are drawn grey rather than dropped. A zone vanishing from
         // the map as its feed dies hides the outage; a grey marker shows it.
         const color = condition
-          ? condition.hasData && condition.riskLevel
-            ? CONDITION_COLORS[condition.riskLevel]
+          ? condition.hasData
+            ? (colorForLayer(layer, condition) ?? NO_DATA_COLOR)
             : NO_DATA_COLOR
           : ZONE_TYPE_COLORS[zone.zoneType];
 
