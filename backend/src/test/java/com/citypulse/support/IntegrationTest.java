@@ -100,10 +100,15 @@ public abstract class IntegrationTest {
     }
 
     /**
-     * Slugs seeded by migration V3. Cities with any other slug were created by a
-     * test and must not survive into the next one.
+     * Highest city id the migrations seeded, read once before any test writes.
+     *
+     * <p>Was a hardcoded list of three slugs, which broke the moment V15 added
+     * seven more cities: the reset tried to delete them and hit the foreign key
+     * from zones. The same staleness the zone watermark below was introduced to
+     * avoid — a list of what the migrations seed, kept by hand, is a list that
+     * goes wrong the next time a migration seeds something.
      */
-    private static final List<String> SEEDED_CITY_SLUGS = List.of("bengaluru", "noida", "mumbai");
+    private static Long seededCityWatermark;
 
     /**
      * Highest zone id that migration V3 seeded, read once on the first reset.
@@ -188,8 +193,14 @@ public abstract class IntegrationTest {
                     .setParameter("watermark", seededZoneWatermark)
                     .executeUpdate();
 
-            entityManager.createNativeQuery("DELETE FROM cities WHERE slug NOT IN (:slugs)")
-                    .setParameter("slugs", SEEDED_CITY_SLUGS)
+            // After the zones above, which reference them.
+            if (seededCityWatermark == null) {
+                seededCityWatermark = ((Number) entityManager
+                        .createNativeQuery("SELECT coalesce(max(id), 0) FROM cities")
+                        .getSingleResult()).longValue();
+            }
+            entityManager.createNativeQuery("DELETE FROM cities WHERE id > :watermark")
+                    .setParameter("watermark", seededCityWatermark)
                     .executeUpdate();
         });
     }
