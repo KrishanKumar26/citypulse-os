@@ -40,6 +40,12 @@ COPY generator/ ./generator/
 # build (2.13 for Spark 4.x), and hadoop-aws must match the Hadoop that Spark
 # links against, or the failure is a NoSuchMethodError at first use rather than
 # a resolution error at startup.
+#
+# spark-hadoop-cloud is here for the two committer classes spark-defaults.conf
+# names, and it is the one jar whose absence does not wait to be noticed: Spark
+# validates those class names while building the session, so the job died before
+# reading a single event, reporting an invalid config key rather than a missing
+# jar. Everything else in this list fails at first use; this one fails at start.
 RUN mkdir -p /opt/spark/jars \
     && cd /opt/spark/jars \
     && curl -fsSLO https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.4.1/hadoop-aws-3.4.1.jar \
@@ -47,7 +53,8 @@ RUN mkdir -p /opt/spark/jars \
     && curl -fsSLO https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.13/4.0.0/spark-sql-kafka-0-10_2.13-4.0.0.jar \
     && curl -fsSLO https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.13/4.0.0/spark-token-provider-kafka-0-10_2.13-4.0.0.jar \
     && curl -fsSLO https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.9.0/kafka-clients-3.9.0.jar \
-    && curl -fsSLO https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.12.0/commons-pool2-2.12.0.jar
+    && curl -fsSLO https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.12.0/commons-pool2-2.12.0.jar \
+    && curl -fsSLO https://repo1.maven.org/maven2/org/apache/spark/spark-hadoop-cloud_2.13/4.0.0/spark-hadoop-cloud_2.13-4.0.0.jar
 
 COPY docker/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
 
