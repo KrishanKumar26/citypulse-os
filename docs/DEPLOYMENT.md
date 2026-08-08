@@ -234,8 +234,16 @@ Not done, and not to be skipped:
 3. **TLS**, with the API behind it.
 4. **Managed PostgreSQL** with point-in-time recovery. The current setup has one
    database and one `pg_dump`.
-5. **A real mail provider.** Email verification is currently disabled and
-   verification links are written to the log.
+5. **A real mail provider.** SMTP is wired but unconfigured, so links go to the
+   log and `LoggingEmailSender` says so in every line it writes. Set
+   `CITYPULSE_SMTP_HOST`, `CITYPULSE_SMTP_USERNAME`, `CITYPULSE_SMTP_PASSWORD`
+   and `CITYPULSE_MAIL_FROM` to switch on delivery.
+
+   The application **refuses to start** if `CITYPULSE_REQUIRE_EMAIL_VERIFICATION`
+   is true while no host is set. That pair locks every new account out
+   invisibly — signup succeeds, the user is told to check an inbox, and the link
+   is in a server log they cannot read — so it fails loudly rather than
+   quietly.
 6. **Container image scanning** in CI.
 7. **Backups** and a tested restore. An untested restore is not a backup.
 

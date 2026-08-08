@@ -11,6 +11,33 @@ spring:
   application:
     name: citypulse-backend
 
+  # Mail.
+  #
+  # Unset by default, and that is a working configuration rather than a broken
+  # one: without a host the platform uses LoggingEmailSender, which writes each
+  # link to the log and says in every line that nothing was delivered.
+  #
+  # Setting a host switches to real delivery. The application refuses to start
+  # if email verification is required while no host is set — see
+  # NotificationConfig — because that combination locks every new account out
+  # invisibly.
+  mail:
+    host: ${CITYPULSE_SMTP_HOST:}
+    port: ${CITYPULSE_SMTP_PORT:587}
+    username: ${CITYPULSE_SMTP_USERNAME:}
+    password: ${CITYPULSE_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${CITYPULSE_SMTP_AUTH:true}
+          # STARTTLS, not plaintext. Credentials and reset links travel here.
+          starttls:
+            enable: ${CITYPULSE_SMTP_STARTTLS:true}
+            required: ${CITYPULSE_SMTP_STARTTLS:true}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   datasource:
     url: ${CITYPULSE_DB_URL:jdbc:postgresql://localhost:5432/citypulse}
     username: ${CITYPULSE_DB_USER:citypulse}
@@ -79,6 +106,11 @@ server:
   shutdown: graceful
 
 citypulse:
+  notification:
+    # Envelope sender. Must be an address the provider will accept, or every
+    # message is rejected at submission regardless of the rest of the setup.
+    from: ${CITYPULSE_MAIL_FROM:no-reply@citypulse.local}
+
   app:
     name: CityPulse OS
     # Used to build verification and reset links. Configured, never derived from
@@ -155,6 +187,14 @@ management:
       probes:
         enabled: true
   health:
+    # Off. Adding the mail starter registers a health indicator that tries to
+    # reach SMTP, and with no host configured it reports DOWN — which took the
+    # whole /actuator/health to 503 and made every readiness probe fail. Running
+    # without a mail provider is a documented, working state, and mail is not on
+    # the path of serving a request: an unreachable provider must not be able to
+    # tell an orchestrator to restart the platform.
+    mail:
+      enabled: false
     livenessstate:
       enabled: true
     readinessstate:

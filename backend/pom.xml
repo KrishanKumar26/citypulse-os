@@ -36,6 +36,16 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!--
+            Mail. Present so the platform *can* deliver; whether it does depends
+            on configuration, and the application says which at startup rather
+            than leaving an operator to guess from an empty inbox.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
