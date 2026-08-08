@@ -1,5 +1,7 @@
 import { api } from "./client";
 import type {
+  Intervention,
+  ResponsePlan,
   ApiKeyCreated,
   ApiKeySummary,
   ScopeCatalogue,
@@ -86,6 +88,22 @@ export const apiKeyApi = {
     api.post<ApiKeyCreated>("/api/v1/api-keys", body),
   /** Reason is optional and the endpoint accepts a bodyless DELETE. */
   revoke: (keyId: string) => api.delete<ApiKeySummary>(`/api/v1/api-keys/${keyId}`),
+};
+
+export const responseApi = {
+  list: (citySlug: string, openOnly = true) =>
+    api.get<ResponsePlan[]>(
+      `/api/v1/response-plans?citySlug=${citySlug}&openOnly=${openOnly}`),
+  updateStep: (planId: string, stepId: string,
+               body: { status: string; note?: string; interventionId?: string }) =>
+    api.patch<ResponsePlan>(`/api/v1/response-plans/${planId}/steps/${stepId}`, body),
+  updatePlan: (planId: string, body: { status?: string; assignedTo?: string }) =>
+    api.patch<ResponsePlan>(`/api/v1/response-plans/${planId}`, body),
+};
+
+export const interventionApi = {
+  list: (citySlug: string) =>
+    api.get<Intervention[]>(`/api/v1/interventions?citySlug=${citySlug}`),
 };
 
 export const platformApi = {

@@ -49,6 +49,8 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
     heading: "Operations",
     items: [
       { label: "Alerts", href: "/alerts", icon: "bell", available: true },
+      { label: "Action Center", href: "/response-plans", icon: "check", available: true },
+      { label: "Impact", href: "/impact", icon: "target", available: true },
     ],
   },
   {
@@ -163,6 +165,8 @@ function NavIcon({ name }: { name: string }) {
     beaker: "M9 3v6L4 19a2 2 0 002 2h12a2 2 0 002-2l-5-10V3M8 3h8",
     sparkle: "M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z",
     layers: "M12 3l9 5-9 5-9-5zM3 13l9 5 9-5",
+    check: "M4 12.5l5 5L20 6.5",
+    target: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 16a4 4 0 100-8 4 4 0 000 8zM12 13a1 1 0 100-2 1 1 0 000 2z",
     bell: "M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M13.7 21a2 2 0 01-3.4 0",
     chart: "M3 3v18h18M8 16V10M13 16V6M18 16v-4",
     shield: "M12 3l8 3v6c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V6zM9 12l2 2 4-4",

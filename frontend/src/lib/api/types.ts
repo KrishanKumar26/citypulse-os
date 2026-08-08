@@ -704,3 +704,85 @@ export interface ScopeCatalogue {
   /** Exactly the permissions the caller holds and may therefore grant. */
   grantable: string[];
 }
+
+// --- Response plans ---------------------------------------------------------
+
+export interface ResponseStep {
+  id: string;
+  position: number;
+  instruction: string;
+  /** True only for the step an alert rule supplied. Everything else was typed. */
+  fromAlertRule: boolean;
+  status: "PENDING" | "DONE" | "BLOCKED" | "SKIPPED";
+  note: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+  interventionId: string | null;
+}
+
+export interface ResponsePlan {
+  id: string;
+  title: string;
+  summary: string | null;
+  citySlug: string;
+  zoneId: string | null;
+  zoneName: string | null;
+  alertId: string | null;
+  alertTitle: string | null;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  status: "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+  createdBy: string;
+  assignedTo: string | null;
+  activatedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  stepsDone: number;
+  stepsTotal: number;
+  stepsBlocked: number;
+  steps: ResponseStep[];
+  demoData: boolean;
+}
+
+// --- Interventions and measured impact --------------------------------------
+
+export interface MetricImpact {
+  metric: string;
+  before: string | null;
+  after: string | null;
+  changePct: string | null;
+  baseline: string | null;
+  /** Change beyond what the baseline already accounts for — the only figure
+      that says anything about the action. Null without a baseline. */
+  excessChangePct: string | null;
+  baselineSamples: number;
+}
+
+export interface Impact {
+  windowsBefore: number;
+  windowsAfter: number;
+  /** False when a side has no windows: unmeasurable, not ineffective. */
+  measurable: boolean;
+  unmeasurableReason: string | null;
+  /** True while still running, so the window after is still filling. */
+  provisional: boolean;
+  metrics: MetricImpact[];
+}
+
+export interface Intervention {
+  id: string;
+  title: string;
+  description: string | null;
+  actionType: string;
+  zoneId: string | null;
+  zoneName: string | null;
+  citySlug: string;
+  startedAt: string;
+  endedAt: string | null;
+  status: string;
+  recordedBy: string;
+  comparisonMinutes: number;
+  notes: string | null;
+  /** Null for a city-wide action, which has no zone baseline to compare against. */
+  impact: Impact | null;
+  demoData: boolean;
+}
