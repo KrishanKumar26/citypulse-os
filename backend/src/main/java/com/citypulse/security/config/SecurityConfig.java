@@ -1,6 +1,7 @@
 package com.citypulse.security.config;
 
 import com.citypulse.common.config.SecurityProperties;
+import com.citypulse.security.filter.ApiKeyAuthenticationFilter;
 import com.citypulse.security.filter.JwtAuthenticationFilter;
 import com.citypulse.security.filter.RateLimitFilter;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -65,17 +66,20 @@ public class SecurityConfig {
 
     private final SecurityProperties properties;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(SecurityProperties properties,
                           JwtAuthenticationFilter jwtAuthenticationFilter,
+                          ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
                           RateLimitFilter rateLimitFilter,
                           RestAuthenticationEntryPoint authenticationEntryPoint,
                           RestAccessDeniedHandler accessDeniedHandler) {
         this.properties = properties;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
         this.rateLimitFilter = rateLimitFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
@@ -116,7 +120,13 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").hasAuthority("system:manage")
                         .anyRequest().authenticated())
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // After the JWT filter, not before. A request carrying both a
+                // bearer token and a key is a human session that also happens to
+                // send a key header; the session is the more specific claim and
+                // the filter that already authenticated wins, because each filter
+                // only acts when the context is still empty.
+                .addFilterAfter(apiKeyAuthenticationFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
