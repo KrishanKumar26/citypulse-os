@@ -12,7 +12,9 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  Metric,
   PageHeader,
+  cn,
 } from "@/components/ui";
 import { geoApi, simulationApi } from "@/lib/api/endpoints";
 import type {
@@ -285,18 +287,54 @@ export default function SimulatorPage() {
   );
 }
 
+/**
+ * Which direction is the bad one, per headline figure.
+ *
+ * <p>Parking is the odd one out and the reason this table exists rather than a
+ * single rule. The engine returns *availability*, negated from vehicle demand —
+ * "more vehicles means less availability, hence the negation" — so a positive
+ * parking figure is the only positive number on this row that is good news.
+ * Colouring the four alike would paint the one improvement in the set red.
+ */
+const HEADLINE: Array<{
+  label: string;
+  read: (r: SimulationDetail) => string | null;
+  format: (n: number) => string;
+  higherIsWorse: boolean;
+}> = [
+  { label: "Traffic", read: (r) => r.trafficChangePct, format: signedPct, higherIsWorse: true },
+  { label: "Crowd", read: (r) => r.crowdChangePct, format: signedPct, higherIsWorse: true },
+  {
+    // Named for what it measures. "Parking" alone leaves a reader to guess
+    // whether more is congestion or capacity.
+    label: "Parking availability",
+    read: (r) => r.parkingChangePct,
+    format: signedPct,
+    higherIsWorse: false,
+  },
+  {
+    label: "Delay",
+    read: (r) => r.delayChangeMin,
+    format: (n) => `${n > 0 ? "+" : ""}${n.toFixed(1)} min`,
+    higherIsWorse: true,
+  },
+];
+
+function signedPct(n: number): string {
+  return `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
+}
+
+/** Null unless the figure moved: zero change is neither good nor bad. */
+function toneOf(n: number, higherIsWorse: boolean): "normal" | "high" | null {
+  if (n === 0) return null;
+  return n > 0 === higherIsWorse ? "high" : "normal";
+}
+
 function ResultView({ result }: { result: SimulationDetail }) {
-  const headline: Array<[string, string]> = [
-    ["Traffic", pct(result.trafficChangePct)],
-    ["Crowd", pct(result.crowdChangePct)],
-    ["Parking", pct(result.parkingChangePct)],
-    [
-      "Delay",
-      result.delayChangeMin === null
-        ? "—"
-        : `${Number(result.delayChangeMin) > 0 ? "+" : ""}${Number(result.delayChangeMin).toFixed(1)} min`,
-    ],
-  ];
+  const baselineRisk = result.baselineRisk === null ? null : Number(result.baselineRisk);
+  const simulatedRisk = result.simulatedRisk === null ? null : Number(result.simulatedRisk);
+  const riskDelta =
+    baselineRisk === null || simulatedRisk === null ? null : simulatedRisk - baselineRisk;
 
   return (
     <>
@@ -319,26 +357,45 @@ function ResultView({ result }: { result: SimulationDetail }) {
           }
         />
 
-        <div className="grid gap-px bg-line-subtle sm:grid-cols-4">
-          {headline.map(([label, value]) => (
-            <div key={label} className="bg-surface-raised px-4 py-3.5">
-              <div className="text-[12px] text-content-tertiary">{label}</div>
-              <div className="mt-1 text-xl font-semibold tabular tracking-tight">{value}</div>
-            </div>
-          ))}
+        {/* Composite risk leads, because it is the one figure that answers "is
+            this scenario better or worse". The four component changes sit
+            beneath it — they explain the movement, they are not the verdict. */}
+        <div className="grid gap-px bg-line-subtle sm:grid-cols-[minmax(0,1.15fr)_minmax(0,2fr)]">
+          <div className="bg-surface-raised px-5 py-4">
+            <Metric
+              label="Composite risk"
+              emphasis="hero"
+              value={riskDelta === null ? null : `${riskDelta > 0 ? "+" : ""}${riskDelta.toFixed(0)}`}
+              level={riskDelta === null ? null : toneOf(riskDelta, true)}
+              absenceReason="No baseline risk"
+              note={
+                baselineRisk === null || simulatedRisk === null
+                  ? undefined
+                  : `${baselineRisk.toFixed(0)} → ${simulatedRisk.toFixed(0)} out of 100`
+              }
+            />
+            <RiskShift baseline={baselineRisk} simulated={simulatedRisk} />
+          </div>
+
+          <div className="grid gap-px bg-line-subtle sm:grid-cols-2">
+            {HEADLINE.map((metric) => {
+              const raw = metric.read(result);
+              const n = raw === null ? null : Number(raw);
+              return (
+                <div key={metric.label} className="bg-surface-raised px-4 py-3.5">
+                  <Metric
+                    label={metric.label}
+                    value={n === null ? null : metric.format(n)}
+                    level={n === null ? null : toneOf(n, metric.higherIsWorse)}
+                    absenceReason="Not modelled"
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-line-subtle px-5 py-3 text-[13px]">
-          <span className="text-content-tertiary">
-            Composite risk{" "}
-            <span className="tabular text-content-primary">
-              {result.baselineRisk === null ? "—" : Number(result.baselineRisk).toFixed(0)}
-            </span>{" "}
-            →{" "}
-            <span className="tabular font-medium text-content-primary">
-              {result.simulatedRisk === null ? "—" : Number(result.simulatedRisk).toFixed(0)}
-            </span>
-          </span>
           <span className="text-content-tertiary">
             {result.zonesAffected} {result.zonesAffected === 1 ? "zone" : "zones"} affected
           </span>
@@ -589,5 +646,56 @@ function NumberInput({
       onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
       className="w-full rounded-md border border-line-subtle bg-surface-raised px-2.5 py-1.5 text-[13px] tabular"
     />
+  );
+}
+
+/**
+ * Baseline and simulated risk as two marks on one 0–100 track.
+ *
+ * <p>A pair of numbers with an arrow between them makes the reader do the
+ * subtraction and gives no sense of scale: 42 → 58 and 82 → 98 are the same
+ * arithmetic and not the same situation. On a shared track the second is
+ * visibly near the top.
+ */
+function RiskShift({ baseline, simulated }: { baseline: number | null; simulated: number | null }) {
+  if (baseline === null || simulated === null) return null;
+
+  const clamp = (n: number) => Math.max(0, Math.min(100, n));
+  const from = clamp(baseline);
+  const to = clamp(simulated);
+  const worse = to > from;
+
+  return (
+    <div className="mt-3">
+      <div className="relative h-1.5 rounded-full bg-surface-hover">
+        {/* The span between the two, coloured by direction of travel. */}
+        <div
+          className={cn(
+            "absolute inset-y-0 rounded-full",
+            worse ? "bg-status-high" : "bg-status-normal",
+          )}
+          style={{ left: `${Math.min(from, to)}%`, width: `${Math.abs(to - from)}%` }}
+        />
+        {/* Two-pixel surface ring so the marks stay legible where they overlap. */}
+        <span
+          aria-hidden="true"
+          className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface-raised bg-content-tertiary"
+          style={{ left: `${from}%` }}
+        />
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface-raised",
+            worse ? "bg-status-high" : "bg-status-normal",
+          )}
+          style={{ left: `${to}%` }}
+        />
+      </div>
+      <div className="mt-1.5 flex justify-between text-[10px] text-content-tertiary">
+        <span>0</span>
+        <span>now {from.toFixed(0)} · scenario {to.toFixed(0)}</span>
+        <span>100</span>
+      </div>
+    </div>
   );
 }

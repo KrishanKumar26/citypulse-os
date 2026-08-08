@@ -75,7 +75,19 @@ spring:
     validate-on-migrate: true
 
   jackson:
-    default-property-inclusion: non_null
+    # Null fields are serialised, not dropped.
+    #
+    # Omitting them saves a little payload and costs correctness. Every client
+    # type declares these fields as `T | null`, and a field that never arrives is
+    # `undefined` — so `x === null` is false, the absence falls through the guard
+    # written to catch it, and `Number(undefined)` produces NaN. That reached the
+    # UI as "last used NaNd ago" on a key that had never been used, and roughly
+    # thirty other guards were one null away from the same thing.
+    #
+    # "Measured as null" and "not sent" are the same fact here, and only one of
+    # them survives a strict comparison. ApiResponse and ApiError keep their own
+    # @JsonInclude(NON_NULL), so a success response still carries no error key.
+    default-property-inclusion: always
     serialization:
       write-dates-as-timestamps: false
       fail-on-empty-beans: false

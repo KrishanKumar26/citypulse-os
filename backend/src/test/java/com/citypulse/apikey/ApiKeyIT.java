@@ -54,6 +54,30 @@ class ApiKeyIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("sends an unused key's lastUsedAt as an explicit null, not an absent field")
+    void nullFieldsAreSerialisedRatherThanDropped() throws Exception {
+        Tokens tokens = loginAs("key-nulls@example.com", RoleName.CITY_OPERATOR);
+        create(tokens.accessToken(), """
+                {"name":"Never used","scopes":["telemetry:read"]}
+                """);
+
+        JsonNode key = objectMapper.readTree(
+                        mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/api-keys")
+                                        .header("Authorization", "Bearer " + tokens.accessToken()))
+                                .andExpect(status().isOk())
+                                .andReturn().getResponse().getContentAsString())
+                .path("data").path(0);
+
+        // The distinction this pins down is invisible from Java and decisive in
+        // TypeScript: a client field typed `string | null` is `undefined` when
+        // the key is missing, so every `x === null` guard written to catch the
+        // absence falls straight through it. This one reached the interface as
+        // "last used NaNd ago" on a key nobody had used.
+        assertThat(key.has("lastUsedAt")).isTrue();
+        assertThat(key.get("lastUsedAt").isNull()).isTrue();
+    }
+
+    @Test
     @DisplayName("refuses to mint a key with permissions the creator lacks")
     void refusesPrivilegeEscalation() throws Exception {
         Tokens tokens = loginAs("key-escalate@example.com", RoleName.CITY_OPERATOR);

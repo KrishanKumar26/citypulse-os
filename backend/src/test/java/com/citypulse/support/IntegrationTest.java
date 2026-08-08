@@ -81,10 +81,12 @@ public abstract class IntegrationTest {
     /**
      * True when a field is absent or null in a response.
      *
-     * <p>Deliberately {@code hasNonNull} rather than {@code path(field).isNull()}:
-     * Jackson omits null fields entirely, so the latter returns false for a key
-     * that was never serialised — an assertion that passes for the wrong reason.
-     * Four assertions in this suite once did exactly that.
+     * <p>Deliberately {@code hasNonNull} rather than {@code path(field).isNull()}.
+     * Jackson used to omit null fields entirely, so the latter returned false for
+     * a key that was never serialised — an assertion that passed for the wrong
+     * reason, as four in this suite once did. Nulls are serialised now
+     * (application.yml), which makes both forms correct, and this one stays
+     * because it holds whichever way that setting goes.
      */
     protected boolean notMeasured(JsonNode node, String field) {
         return !node.hasNonNull(field);

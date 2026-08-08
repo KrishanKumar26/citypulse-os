@@ -5,7 +5,17 @@ import { useMemo, useState } from "react";
 
 import { KpiRow } from "@/components/live/KpiRow";
 import { LiveStatusBar } from "@/components/live/LiveStatusBar";
-import { Badge, Card, CardHeader, EmptyState, ErrorState, LoadingState, PageHeader } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Metric,
+  PageHeader,
+  cn,
+} from "@/components/ui";
 import { ZONE_TYPE_LABELS } from "@/components/map/ZoneMap";
 import type { ConditionLevel, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
@@ -165,31 +175,42 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
     );
   }
 
-  const rows: Array<[string, string]> = [
-    ["Congestion", condition.congestionLevel ?? "Not measured"],
-    [
-      "Occupancy",
-      condition.occupancyRatio
-        ? `${(Number(condition.occupancyRatio) * 100).toFixed(0)}% of capacity`
-        : "Not measured",
-    ],
-    [
-      "Average speed",
-      condition.averageSpeedKph ? `${Number(condition.averageSpeedKph).toFixed(1)} km/h` : "Not measured",
-    ],
-    ["Vehicles", condition.vehicleCount != null ? String(condition.vehicleCount) : "Not measured"],
-    [
-      "Air quality",
-      condition.aqi != null ? `${condition.aqi} (${condition.aqiCategory ?? "—"})` : "Not measured",
-    ],
-    [
-      "Weather",
-      condition.temperatureC
-        ? `${Number(condition.temperatureC).toFixed(1)}°C, ${condition.weatherCondition?.replace(/_/g, " ").toLowerCase() ?? "—"}`
-        : "Not measured",
-    ],
-    ["Open incidents", String(condition.activeIncidents)],
-    ["Scheduled events", String(condition.activeEvents)],
+  // Grouped by what a reader is asking. Eight undifferentiated rows make
+  // "is traffic bad" and "is the air bad" cost the same search; they are not
+  // the same question and rarely asked at the same moment.
+  const groups: Array<[string, Array<[string, string]>]> = [
+    ["Traffic", [
+      ["Congestion", condition.congestionLevel ?? "Not measured"],
+      [
+        "Occupancy",
+        condition.occupancyRatio
+          ? `${(Number(condition.occupancyRatio) * 100).toFixed(0)}% of capacity`
+          : "Not measured",
+      ],
+      [
+        "Average speed",
+        condition.averageSpeedKph
+          ? `${Number(condition.averageSpeedKph).toFixed(1)} km/h`
+          : "Not measured",
+      ],
+      ["Vehicles", condition.vehicleCount != null ? String(condition.vehicleCount) : "Not measured"],
+    ]],
+    ["Environment", [
+      [
+        "Air quality",
+        condition.aqi != null ? `${condition.aqi} (${condition.aqiCategory ?? "—"})` : "Not measured",
+      ],
+      [
+        "Weather",
+        condition.temperatureC
+          ? `${Number(condition.temperatureC).toFixed(1)}°C, ${condition.weatherCondition?.replace(/_/g, " ").toLowerCase() ?? "—"}`
+          : "Not measured",
+      ],
+    ]],
+    ["Activity", [
+      ["Open incidents", String(condition.activeIncidents)],
+      ["Scheduled events", String(condition.activeEvents)],
+    ]],
   ];
 
   return (
@@ -199,18 +220,43 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
         description={ZONE_TYPE_LABELS[condition.zoneType]}
         action={
           condition.riskLevel ? (
-            <Badge level={LEVEL_BADGE[condition.riskLevel]}>
-              {condition.riskLevel}
-              {condition.riskScore && ` · ${Number(condition.riskScore).toFixed(0)}`}
-            </Badge>
+            <Badge level={LEVEL_BADGE[condition.riskLevel]}>{condition.riskLevel}</Badge>
           ) : undefined
         }
       />
-      <dl className="divide-y divide-line-subtle">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between gap-4 px-5 py-2.5">
-            <dt className="text-[13px] text-content-tertiary">{label}</dt>
-            <dd className="text-[13px] tabular text-content-primary">{value}</dd>
+
+      {/* Composite risk leads: it is the one number that ranks this zone against
+          the others, and it was previously only legible inside a badge. */}
+      <div className="border-b border-line-subtle px-5 py-4">
+        <Metric
+          label="Composite risk"
+          emphasis="hero"
+          value={condition.riskScore === null ? null : Number(condition.riskScore).toFixed(0)}
+          unit="/ 100"
+          level={condition.riskLevel ? LEVEL_BADGE[condition.riskLevel] : null}
+          absenceReason="Not scored"
+        />
+      </div>
+
+      <dl>
+        {groups.map(([heading, rows]) => (
+          <div key={heading} className="border-b border-line-subtle last:border-0">
+            <div className="px-5 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.09em] text-content-disabled">
+              {heading}
+            </div>
+            {rows.map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between gap-4 px-5 py-1.5">
+                <dt className="text-[13px] text-content-tertiary">{label}</dt>
+                <dd
+                  className={cn(
+                    "text-[13px] tabular",
+                    value === "Not measured" ? "text-content-disabled" : "text-content-primary",
+                  )}
+                >
+                  {value}
+                </dd>
+              </div>
+            ))}
           </div>
         ))}
       </dl>
@@ -310,8 +356,11 @@ function ZoneConditionTable({
                   <td className="px-5 py-2.5 text-right tabular">
                     {zone.hasData ? zone.activeIncidents : "—"}
                   </td>
-                  <td className="px-5 py-2.5 text-right tabular">
-                    {zone.riskScore ? Number(zone.riskScore).toFixed(0) : "—"}
+                  {/* The column the table is sorted by, so it carries a mark as
+                      well as a number. Fifteen rows of bare digits make the
+                      ordering something you verify rather than see. */}
+                  <td className="py-2.5 pl-5 pr-5">
+                    <RiskCell score={zone.riskScore} level={zone.riskLevel} />
                   </td>
                 </tr>
               ))}
@@ -320,5 +369,38 @@ function ZoneConditionTable({
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * Risk as a number and a mark on a shared 0–100 track.
+ *
+ * <p>A zone that has not reported gets neither. Drawing an unreported zone as a
+ * zero-length bar would rank a dead feed as the calmest place in the city, which
+ * is the failure this table exists to prevent.
+ */
+function RiskCell({ score, level }: { score: string | null; level: ConditionLevel | null }) {
+  if (score === null) {
+    return <div className="text-right text-[12px] text-content-disabled">—</div>;
+  }
+
+  const value = Number(score);
+  const tone: Record<ConditionLevel, string> = {
+    NORMAL: "bg-status-normal",
+    MODERATE: "bg-status-moderate",
+    HIGH: "bg-status-high",
+    CRITICAL: "bg-status-critical",
+  };
+
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-hover">
+        <div
+          className={cn("h-full rounded-full", level ? tone[level] : "bg-content-tertiary")}
+          style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+        />
+      </div>
+      <span className="w-6 text-right tabular">{value.toFixed(0)}</span>
+    </div>
   );
 }
