@@ -42,6 +42,7 @@ def aggregate(
     zone_ids: dict[str, int],
     zone_city: dict[str, str],
     window: timedelta = DEFAULT_WINDOW,
+    stats: dict | None = None,
 ) -> list[dict]:
     """Fold validated events into one row per zone per window.
 
@@ -54,7 +55,17 @@ def aggregate(
     signals stay null rather than defaulting to zero: "no air quality reading"
     and "AQI is 0" are different facts and the dashboard must be able to tell
     them apart.
+
+    `stats`, if given, is filled with what this stage did and did not keep. Two
+    kinds of event are dropped here and nothing was counting either: one whose
+    timestamp will not parse, and one for a zone code the catalogue does not
+    know. Both are silent — the window simply never appears — so a mis-seeded
+    zone or a malformed feed could remove a junction from the dashboard with no
+    trace anywhere. Optional so the Spark job and the tests are unaffected.
     """
+    seen = 0
+    dropped_no_timestamp = 0
+    dropped_unknown_zone = 0
     traffic: dict[tuple[str, datetime], list[dict]] = defaultdict(list)
     air: dict[tuple[str, datetime], list[dict]] = defaultdict(list)
     weather_by_city: dict[tuple[str, datetime], list[dict]] = defaultdict(list)
@@ -62,9 +73,11 @@ def aggregate(
     city_events: list[dict] = []
 
     for event in events:
+        seen += 1
         event_type = event.get("event_type")
         moment = _parse(event.get("event_time"))
         if moment is None:
+            dropped_no_timestamp += 1
             continue
         bucket = window_start(moment, window)
 
@@ -93,6 +106,7 @@ def aggregate(
     for zone_code, bucket in sorted(keys, key=lambda k: (k[0], k[1])):
         zone_id = zone_ids.get(zone_code)
         if zone_id is None:
+            dropped_unknown_zone += 1
             continue
 
         window_end = bucket + window
@@ -163,6 +177,15 @@ def aggregate(
             "sample_count": len(traffic_rows) + len(air_rows) + len(weather_rows),
             "demo_data": True,
         })
+
+    if stats is not None:
+        stats["events_seen"] = seen
+        stats["dropped_no_timestamp"] = dropped_no_timestamp
+        # Counted per zone-window rather than per event: a zone the catalogue
+        # does not know contributes no window, and the event count behind it is
+        # not recoverable here without a second pass nobody needs.
+        stats["dropped_unknown_zone"] = dropped_unknown_zone
+        stats["windows_emitted"] = len(rows)
 
     return rows
 

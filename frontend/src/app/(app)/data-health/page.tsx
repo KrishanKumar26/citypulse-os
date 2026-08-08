@@ -31,20 +31,29 @@ import type { StageQuality } from "@/lib/api/types";
  * conclusions rest on, including its own gaps.
  */
 
+/**
+ * The four stages, named as the schema names them.
+ *
+ * INGEST, VALIDATE, AGGREGATE, LOAD — the check constraint on
+ * data_quality_metrics is the authority, and it rejected an invented
+ * "TRANSFORM" rather than storing a name nothing else would recognise.
+ */
 const STAGE_LABEL: Record<string, string> = {
+  INGEST: "Ingest",
   VALIDATE: "Validation",
-  TRANSFORM: "Transformation",
+  AGGREGATE: "Aggregation",
   LOAD: "Load",
 };
 
 const STAGE_NOTE: Record<string, string> = {
+  INGEST: "Reading events off the source before anything is examined.",
   VALIDATE: "Schema, physical bounds and lateness checks before anything is stored.",
-  TRANSFORM: "Windowing and derivation into curated metrics.",
-  LOAD: "Writing curated rows to the database.",
+  AGGREGATE: "Folding events into curated five-minute windows per zone.",
+  LOAD: "Writing raw events. Duplicates are recognised and skipped, not refused.",
 };
 
 /** Stages the pipeline has, so a missing one can be named rather than omitted. */
-const ALL_STAGES = ["VALIDATE", "TRANSFORM", "LOAD"] as const;
+const ALL_STAGES = ["INGEST", "VALIDATE", "AGGREGATE", "LOAD"] as const;
 
 function formatCount(n: number): string {
   return n.toLocaleString();
@@ -177,7 +186,23 @@ export default function DataHealthPage() {
 
 function StageRow({ stage }: { stage: StageQuality }) {
   const ratio = stage.validityRatio === null ? null : Number(stage.validityRatio);
-  const problems = stage.recordsRejected + stage.recordsDuplicate + stage.recordsLate;
+
+  /*
+   * Colour follows refusals, not the ratio.
+   *
+   * At LOAD the writers skip an event already stored, so re-running a file
+   * reports 305 offered and 19 kept — a ratio of 6% that is not a fault at all.
+   * Colouring by ratio would paint a correct, idempotent re-ingestion bright red
+   * and teach the reader to ignore the colour. A record that was *refused* is
+   * the thing worth alarming about, and a late one is worth noting.
+   */
+  const refused = stage.recordsRejected;
+  const late = stage.recordsLate;
+  const clean = refused === 0 && late === 0;
+
+  // "Valid" is the wrong word at LOAD, where the shortfall is recognition of
+  // something already held rather than a judgement about the record.
+  const ratioLabel = stage.stage === "LOAD" ? "% newly stored" : "% valid";
 
   return (
     <section className="px-5 py-4">
@@ -200,16 +225,16 @@ function StageRow({ stage }: { stage: StageQuality }) {
               <span
                 className={cn(
                   "tabular text-[20px] font-semibold leading-none",
-                  ratio >= 0.999
-                    ? "text-status-normal"
-                    : ratio >= 0.99
+                  refused > 0
+                    ? "text-status-high"
+                    : late > 0
                       ? "text-status-moderate"
-                      : "text-status-high",
+                      : "text-content-primary",
                 )}
               >
-                {(ratio * 100).toFixed(ratio >= 0.999 ? 1 : 2)}
+                {(ratio * 100).toFixed(ratio >= 0.999 ? 1 : 1)}
               </span>
-              <span className="ml-1 text-[11px] text-content-tertiary">% valid</span>
+              <span className="ml-1 text-[11px] text-content-tertiary">{ratioLabel}</span>
             </>
           )}
         </div>
@@ -224,9 +249,8 @@ function StageRow({ stage }: { stage: StageQuality }) {
           tone={stage.recordsRejected > 0 ? "high" : undefined}
         />
         <Figure
-          label="Duplicate"
+          label={stage.stage === "LOAD" ? "Already held" : "Duplicate"}
           value={formatCount(stage.recordsDuplicate)}
-          tone={stage.recordsDuplicate > 0 ? "moderate" : undefined}
         />
         <Figure
           label="Late"
@@ -244,8 +268,17 @@ function StageRow({ stage }: { stage: StageQuality }) {
           // it has none.
           <> · lag not recorded</>
         )}
-        {problems === 0 && stage.recordsReceived > 0 && (
-          <> · nothing rejected, duplicated or late</>
+        {clean && stage.recordsReceived > 0 && (
+          <> · nothing refused or late</>
+        )}
+        {stage.recordsDuplicate > 0 && (
+          // Named as what it is. At LOAD this is the writers recognising an
+          // event they already hold, which is the pipeline being idempotent
+          // rather than the pipeline failing.
+          <>
+            {" "}· {stage.recordsDuplicate.toLocaleString()} already held
+            {stage.stage === "LOAD" ? " and skipped" : ""}
+          </>
         )}
       </p>
     </section>

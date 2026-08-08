@@ -206,3 +206,34 @@ class TestRiskIsDerived:
     def test_demo_flag_is_carried_through(self) -> None:
         """PRD §42: synthetic data stays labelled all the way to curated."""
         assert run([traffic(0)])[0]["demo_data"] is True
+
+
+# ---------------------------------------------------------------------------
+
+
+def test_stats_report_what_the_stage_dropped():
+    """The transform stage drops events silently; something has to count them.
+
+    A window simply never appears for an event whose timestamp will not parse or
+    whose zone the catalogue does not know. Nothing else in the pipeline can see
+    that happen, so a mis-seeded zone could remove a junction from the dashboard
+    with no trace anywhere — which is the kind of absence this product is built
+    to make visible.
+    """
+    stats: dict = {}
+    unparseable = traffic(0)
+    unparseable["event_time"] = "not-a-timestamp"
+    events = [traffic(0), unparseable, traffic(0, zone="XXX-UNKNOWN")]
+    rows = aggregate(events, zone_ids=ZONE_IDS, zone_city=ZONE_CITY, window=WINDOW, stats=stats)
+
+    assert stats["events_seen"] == 3
+    assert stats["dropped_no_timestamp"] == 1
+    assert stats["dropped_unknown_zone"] == 1
+    assert stats["windows_emitted"] == len(rows)
+
+
+def test_stats_are_optional():
+    # The Spark job and most tests do not pass stats; collecting them must not
+    # be a condition of the function working.
+    rows = aggregate([traffic(0)], zone_ids=ZONE_IDS, zone_city=ZONE_CITY, window=WINDOW)
+    assert len(rows) == 1

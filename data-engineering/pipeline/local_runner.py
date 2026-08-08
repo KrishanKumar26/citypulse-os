@@ -151,8 +151,10 @@ def main(argv: list[str] | None = None) -> int:
                 )
             connection.commit()
 
+        transform_stats: dict = {}
         windows = aggregate(
-            valid_payloads, zone_ids=zone_ids, zone_city=zone_city, window=window
+            valid_payloads, zone_ids=zone_ids, zone_city=zone_city, window=window,
+            stats=transform_stats,
         )
         for start in range(0, len(windows), args.batch_size):
             loader.write_zone_metrics(connection, windows[start:start + args.batch_size])
@@ -162,9 +164,10 @@ def main(argv: list[str] | None = None) -> int:
             traffic_source = next(
                 (s for s in catalog.sources if s.code == "synthetic-traffic"), None
             )
+            source_id = traffic_source.id if traffic_source else None
             loader.write_quality_metrics(
                 connection,
-                source_id=traffic_source.id if traffic_source else None,
+                source_id=source_id,
                 stage="VALIDATE",
                 window_start_at=earliest,
                 window_end_at=latest + window,
@@ -174,6 +177,57 @@ def main(argv: list[str] | None = None) -> int:
                 duplicate=reason_counts.get("DUPLICATE_EVENT_ID", 0),
                 late=reason_counts.get("TIMESTAMP_TOO_OLD", 0),
                 max_lag_seconds=max_lag or None,
+            )
+
+            # LOAD. The raw writers insert with ON CONFLICT DO NOTHING, so an
+            # event that has already been stored is dropped without a word. That
+            # is the correct behaviour — re-running a file must not duplicate
+            # history — but it means a re-ingestion and a clean load looked
+            # identical, and the gap between offered and written was the only
+            # evidence either way. Nothing was measuring it.
+            if not args.skip_raw:
+                offered = len(valid_payloads)
+                stored = sum(written.values())
+                loader.write_quality_metrics(
+                    connection,
+                    source_id=source_id,
+                    stage="LOAD",
+                    window_start_at=earliest,
+                    window_end_at=latest + window,
+                    received=offered,
+                    valid=stored,
+                    rejected=0,
+                    # Not rejected — already present. The distinction matters:
+                    # rejection means the record was refused, this means it was
+                    # recognised as one already held.
+                    duplicate=max(offered - stored, 0),
+                    late=0,
+                    max_lag_seconds=None,
+                )
+
+            # AGGREGATE — the schema's name for this stage, and the
+            # function's. Two kinds of event vanish here and neither was counted:
+            # one whose timestamp will not parse, and one for a zone code the
+            # catalogue does not know. Both are silent — the window simply never
+            # appears — so a mis-seeded zone could remove a junction from the
+            # dashboard with nothing anywhere recording it.
+            dropped = (
+                transform_stats.get("dropped_no_timestamp", 0)
+                + transform_stats.get("dropped_unknown_zone", 0)
+            )
+            seen = transform_stats.get("events_seen", len(valid_payloads))
+            loader.write_quality_metrics(
+                connection,
+                source_id=source_id,
+                stage="AGGREGATE",
+                window_start_at=earliest,
+                window_end_at=latest + window,
+                received=seen,
+                valid=max(seen - dropped, 0),
+                rejected=transform_stats.get("dropped_unknown_zone", 0),
+                duplicate=0,
+                late=transform_stats.get("dropped_no_timestamp", 0),
+                max_lag_seconds=None,
             )
             connection.commit()
 
@@ -186,6 +240,7 @@ def main(argv: list[str] | None = None) -> int:
             "rejections_by_reason": dict(reason_counts),
             "raw_rows_written": dict(written),
             "curated_windows": len(windows),
+            "transform": transform_stats,
         }, indent=2))
 
     return 0
