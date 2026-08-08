@@ -59,6 +59,18 @@ RUN mkdir -p /opt/spark/jars \
 COPY docker/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
 
 RUN chown -R 185:185 /opt/citypulse
+
+# The streaming checkpoint directory, created here so that it exists in the image
+# before compose mounts a named volume over it.
+#
+# Docker seeds a fresh named volume from whatever is at the mount point in the
+# image, ownership included — but when nothing is there it creates the directory
+# itself, root-owned. The job then runs as 185 and cannot mkdir inside it, and
+# Structured Streaming fails while resolving the checkpoint location, before any
+# query starts. Creating it owned by 185 is what makes the volume come up
+# writable.
+RUN mkdir -p /tmp/citypulse-spark-checkpoint && chown 185:185 /tmp/citypulse-spark-checkpoint
+
 # 185 is the spark user in the upstream image.
 USER 185
 

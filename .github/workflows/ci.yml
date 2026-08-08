@@ -485,7 +485,12 @@ jobs:
             sleep 10
           done
           echo "No curated windows appeared. Logs:"
-          docker logs --tail 80 citypulse-spark
+          # Stack frames are dropped before tailing. A Spark trace is hundreds of
+          # frames deep, so `tail` on the raw log keeps the frames and discards
+          # the one line that says what went wrong — which is exactly what
+          # happened while this job was being fixed.
+          docker logs citypulse-spark 2>&1 \
+            | grep -vE '^[[:space:]]+(at |\.\.\. )' | tail -60
           docker logs --tail 40 citypulse-generator
           exit 1
 
