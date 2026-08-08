@@ -1,7 +1,16 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Card, CardHeader, EmptyState, ErrorState, LoadingState, cn } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+  cn,
+} from "@/components/ui";
 import { dataSourceApi } from "@/lib/api/endpoints";
 import type { DataSourceSummary } from "@/lib/api/types";
 
@@ -47,12 +56,10 @@ export default function DataSourcesPage() {
 
   return (
     <div className="space-y-5 p-5">
-      <header>
-        <h1 className="text-lg font-semibold tracking-tight">Data Sources</h1>
-        <p className="mt-1 text-[13px] text-content-tertiary">
-          The feeds behind every figure in the product, and whether they are delivering.
-        </p>
-      </header>
+      <PageHeader
+        title="Data Sources"
+        subtitle={<>The feeds behind every figure in the product, and whether they are delivering.</>}
+      />
 
       {query.isError ? (
         <ErrorState

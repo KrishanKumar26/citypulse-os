@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 
 import { KpiRow } from "@/components/live/KpiRow";
 import { LiveStatusBar } from "@/components/live/LiveStatusBar";
-import { Badge, Card, CardHeader, EmptyState, ErrorState, LoadingState } from "@/components/ui";
+import { Badge, Card, CardHeader, EmptyState, ErrorState, LoadingState, PageHeader } from "@/components/ui";
 import { ZONE_TYPE_LABELS } from "@/components/map/ZoneMap";
 import type { ConditionLevel, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
@@ -87,21 +87,17 @@ export default function LivePage() {
 
   return (
     <div className="space-y-5 p-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Live Intelligence</h1>
-          <p className="mt-1 text-[13px] text-content-tertiary">
-            {city.name} · streaming conditions from curated telemetry
-          </p>
-        </div>
-      </header>
-
-      <LiveStatusBar
-        snapshot={snapshot}
-        status={status}
-        lastEventAt={lastEventAt}
-        onReconnect={reconnect}
-      />
+      <PageHeader
+        title="Live Intelligence"
+        subtitle={`${city.name} · streaming conditions from curated telemetry`}
+      >
+        <LiveStatusBar
+          snapshot={snapshot}
+          status={status}
+          lastEventAt={lastEventAt}
+          onReconnect={reconnect}
+        />
+      </PageHeader>
 
       <KpiRow kpis={snapshot?.kpis ?? null} loading={!snapshot} />
 

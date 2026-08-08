@@ -427,3 +427,50 @@ const METRIC_TEXT: Record<StatusLevel, string> = {
   info: "text-info",
   neutral: "text-content-primary",
 };
+
+/**
+ * The band a page opens with.
+ *
+ * Every screen was writing its own `<header>` — an 18px heading and a caption,
+ * on the same plane as the cards below it, with four slightly different
+ * paddings. Nothing anchored the top of a page, so the eye landed on whichever
+ * card happened to be brightest rather than on where it was.
+ *
+ * One component so the title, its scale and the surface beneath it cannot drift
+ * apart again — the same reason the severity palette and the map's colours are
+ * now bound together rather than restated.
+ *
+ * `actions` sits opposite the title for controls that belong to the whole page:
+ * a range picker, a filter, a badge about the page's data. Controls that belong
+ * to one card stay on that card.
+ */
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  children,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  /** Rendered below the title row, inside the band — a status strip, usually. */
+  children?: ReactNode;
+}) {
+  return (
+    // Negative margins so the band spans the full width from inside a padded
+    // page, rather than every page having to restructure its wrapper to let it
+    // out. One component's problem instead of nine pages'.
+    <header className="page-header-band -mx-5 -mt-5 mb-5 px-5 pb-4 pt-5">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-semibold leading-none tracking-[-0.02em] text-content-primary">
+            {title}
+          </h1>
+          {subtitle && <p className="mt-2 text-[12px] text-content-tertiary">{subtitle}</p>}
+        </div>
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+      {children && <div className="mt-4">{children}</div>}
+    </header>
+  );
+}

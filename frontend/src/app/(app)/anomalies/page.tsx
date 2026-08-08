@@ -11,6 +11,7 @@ import {
   ErrorState,
   Input,
   LoadingState,
+  PageHeader,
   Skeleton,
   cn,
 } from "@/components/ui";
@@ -116,14 +117,11 @@ export default function AnomaliesPage() {
 
   return (
     <div className="space-y-5 p-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Anomaly Detection</h1>
-          <p className="mt-1 text-[13px] text-content-tertiary">
-            {city.name} · departures from what each zone normally does at this hour of the week
-          </p>
-        </div>
-        <div className="flex items-center gap-1" role="group" aria-label="Time range">
+      <PageHeader
+        title="Anomaly Detection"
+        subtitle={<>{city.name} · departures from what each zone normally does at this hour of the week</>}
+        actions={
+          <div className="flex items-center gap-1" role="group" aria-label="Time range">
           {RANGES.map((range) => (
             <button
               key={range.label}
@@ -141,7 +139,8 @@ export default function AnomaliesPage() {
             </button>
           ))}
         </div>
-      </header>
+        }
+      />
 
       {anomaliesQuery.isError ? (
         <ErrorState

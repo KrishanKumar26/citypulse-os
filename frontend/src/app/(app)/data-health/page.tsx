@@ -2,7 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Card, CardHeader, EmptyState, ErrorState, LoadingState, cn } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+  cn,
+} from "@/components/ui";
 import { dataSourceApi } from "@/lib/api/endpoints";
 import type { StageQuality } from "@/lib/api/types";
 
@@ -55,13 +63,10 @@ export default function DataHealthPage() {
 
   return (
     <div className="space-y-5 p-5">
-      <header>
-        <h1 className="text-lg font-semibold tracking-tight">Data Health</h1>
-        <p className="mt-1 text-[13px] text-content-tertiary">
-          What the pipeline received against what it kept. The evidence behind every other
-          screen.
-        </p>
-      </header>
+      <PageHeader
+        title="Data Health"
+        subtitle={<>What the pipeline received against what it kept. The evidence behind every other screen.</>}
+      />
 
       {query.isError ? (
         <ErrorState

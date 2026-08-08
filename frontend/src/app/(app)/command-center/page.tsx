@@ -9,6 +9,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  PageHeader,
   Skeleton,
   cn,
 } from "@/components/ui";
@@ -84,48 +85,30 @@ export default function CommandCenterPage() {
   const zones = zonesQuery.data ?? [];
 
   return (
-    <div>
-      {/*
-        A header band rather than a line of text.
+    <div className="p-5">
+      <PageHeader
+        title={city.name}
+        subtitle={`${city.country} · ${city.timezone} · ${city.zoneCount} monitored ${
+          city.zoneCount === 1 ? "zone" : "zones"
+        }`}
+      >
+        {/*
+          The freshness strip lives in the band: "what am I looking at" and "is
+          it current" are one question, not two.
 
-        The page opened with an 18px heading on the same plane as everything
-        below it, so the eye landed on whichever card happened to be brightest
-        rather than on where it was. The band gives the top of the screen its own
-        surface and lets the city name carry the weight of a title, with the
-        freshness strip inside it — both answer "what am I looking at, and is it
-        current", which is one question, not two.
-      */}
-      <header className="page-header-band px-5 pb-4 pt-5">
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <div>
-            {/*
-              Labelled once, in the top bar, which is on every page and now shows
-              at every width. Three identical "DEMO DATA" badges shared this
-              screen — top bar, here, and the status strip. Repetition does not
-              make the disclosure stronger; it turns it into decoration people
-              stop reading, which is the opposite of what PRD §42 is for.
-            */}
-            <h1 className="text-[26px] font-semibold leading-none tracking-[-0.02em] text-content-primary">
-              {city.name}
-            </h1>
-            <p className="mt-2 text-[12px] text-content-tertiary">
-              {city.country} · {city.timezone} · {city.zoneCount} monitored{" "}
-              {city.zoneCount === 1 ? "zone" : "zones"}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <LiveStatusBar
+          The city is labelled DEMO DATA once, in the top bar, which is on every
+          page and shows at every width. Three identical badges shared this
+          screen — top bar, page heading, status strip. Repetition does not make
+          a disclosure stronger; it turns it into decoration people stop reading.
+        */}
+        <LiveStatusBar
           snapshot={snapshot}
           status={status}
           lastEventAt={lastEventAt}
-            onReconnect={reconnect}
-          />
-        </div>
-      </header>
+          onReconnect={reconnect}
+        />
+      </PageHeader>
 
-      <div className="p-5">
       {/*
         What needs attention, before what the numbers are.
 
@@ -270,7 +253,6 @@ export default function CommandCenterPage() {
           selectedZoneId={selectedZone?.id ?? null}
           onSelectZone={setSelectedZone}
         />
-      </div>
       </div>
     </div>
   );

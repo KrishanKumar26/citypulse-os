@@ -11,6 +11,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  PageHeader,
 } from "@/components/ui";
 import { forecastApi, geoApi, liveApi } from "@/lib/api/endpoints";
 import type {
@@ -133,15 +134,11 @@ export default function ForecastPage() {
 
   return (
     <div className="space-y-5 p-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Forecast Engine</h1>
-          <p className="mt-1 text-[13px] text-content-tertiary">
-            {city.name} · predictions with the error that produced their confidence
-          </p>
-        </div>
-        {forecastQuery.data?.demoData && <DemoDataBadge />}
-      </header>
+      <PageHeader
+        title="Forecast Engine"
+        subtitle={`${city.name} · predictions with the error that produced their confidence`}
+        actions={forecastQuery.data?.demoData ? <DemoDataBadge /> : undefined}
+      />
 
       <div className="flex flex-wrap gap-3">
         <label className="flex items-center gap-2 text-[13px]">

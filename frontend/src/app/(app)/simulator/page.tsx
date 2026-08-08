@@ -12,6 +12,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  PageHeader,
 } from "@/components/ui";
 import { geoApi, simulationApi } from "@/lib/api/endpoints";
 import type {
@@ -136,12 +137,10 @@ export default function SimulatorPage() {
 
   return (
     <div className="space-y-5 p-5">
-      <header>
-        <h1 className="text-lg font-semibold tracking-tight">What-If Simulator</h1>
-        <p className="mt-1 text-[13px] text-content-tertiary">
-          {city.name} · hypothetical scenarios run against currently observed conditions
-        </p>
-      </header>
+      <PageHeader
+        title="What-If Simulator"
+        subtitle={`${city.name} · hypothetical scenarios run against currently observed conditions`}
+      />
 
       {/*
         Stated once, prominently. Everything below is a model's answer, not a

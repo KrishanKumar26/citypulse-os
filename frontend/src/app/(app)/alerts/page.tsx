@@ -3,7 +3,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, LoadingState } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+} from "@/components/ui";
 import { ApiRequestError } from "@/lib/api/client";
 import { alertApi } from "@/lib/api/endpoints";
 import type { AlertDetail, AlertSeverity, AlertStatus } from "@/lib/api/types";
@@ -73,30 +82,28 @@ export default function AlertsPage() {
 
   return (
     <div className="space-y-5 p-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Alert Center</h1>
-          <p className="mt-1 text-[13px] text-content-tertiary">
-            {city.name} · raised automatically from curated conditions
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={openOnly ? "primary" : "secondary"}
-            size="sm"
-            onClick={() => setOpenOnly(true)}
-          >
-            Open
-          </Button>
-          <Button
-            variant={openOnly ? "secondary" : "primary"}
-            size="sm"
-            onClick={() => setOpenOnly(false)}
-          >
-            All
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="Alert Center"
+        subtitle={`${city.name} · raised automatically from curated conditions`}
+        actions={
+          <>
+            <Button
+              variant={openOnly ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setOpenOnly(true)}
+            >
+              Open
+            </Button>
+            <Button
+              variant={openOnly ? "secondary" : "primary"}
+              size="sm"
+              onClick={() => setOpenOnly(false)}
+            >
+              All
+            </Button>
+          </>
+        }
+      />
 
       {error && <ErrorState title="Alert Center" message={error} onRetry={() => void alertsQuery.refetch()} />}
 

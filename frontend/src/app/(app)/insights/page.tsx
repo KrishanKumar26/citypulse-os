@@ -10,6 +10,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  PageHeader,
   cn,
 } from "@/components/ui";
 import { LiftChart } from "@/components/charts/LiftChart";
@@ -76,12 +77,10 @@ export default function InsightsPage() {
 
   return (
     <div className="space-y-5 p-5">
-      <header>
-        <h1 className="text-lg font-semibold tracking-tight">AI Insights</h1>
-        <p className="mt-1 text-[13px] text-content-tertiary">
-          {city.name} · what the platform can say, and the data it says it from
-        </p>
-      </header>
+      <PageHeader
+        title="AI Insights"
+        subtitle={<>{city.name} · what the platform can say, and the data it says it from</>}
+      />
 
       {insights.isError && (
         <ErrorState
