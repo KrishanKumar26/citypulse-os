@@ -36,12 +36,33 @@ class DataSourceIT extends IntegrationTest {
         JsonNode sources = body.path("data").path("sources");
         assertThat(sources).isNotEmpty();
 
-        // SYNTHETIC is the honest label, not a placeholder for an integration
-        // that was never wired up — PRD §43 makes it a first-class mode.
+        // Each source says what it is, and the two facts travel together.
+        //
+        // This assertion used to be "everything is SYNTHETIC", which was true
+        // until V16 added CPCB. The rule it was really protecting is stronger
+        // and still holds: a generated feed is labelled generated, and a real
+        // one is labelled real. Getting that pairing wrong in either direction
+        // is how synthetic data starts being read as measurement.
         for (JsonNode source : sources) {
-            assertThat(source.path("ingestionMode").asText()).isEqualTo("SYNTHETIC");
-            assertThat(source.path("demoData").asBoolean()).isTrue();
+            String mode = source.path("ingestionMode").asText();
+            boolean demo = source.path("demoData").asBoolean();
+            if ("SYNTHETIC".equals(mode)) {
+                assertThat(demo)
+                        .as("a synthetic feed must be flagged as demo data")
+                        .isTrue();
+            } else {
+                assertThat(demo)
+                        .as("a real feed (%s) must not be flagged as demo data", mode)
+                        .isFalse();
+            }
         }
+
+        // And at least one of each exists, so this test cannot pass vacuously
+        // if a future change removes one side.
+        assertThat(sources).anySatisfy(s ->
+                assertThat(s.path("ingestionMode").asText()).isEqualTo("SYNTHETIC"));
+        assertThat(sources).anySatisfy(s ->
+                assertThat(s.path("ingestionMode").asText()).isEqualTo("REST_API"));
     }
 
     @Test
