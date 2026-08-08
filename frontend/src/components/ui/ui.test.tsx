@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { Badge, Button, ComingSoon, DemoDataBadge, EmptyState, ErrorState, Input } from ".";
+import { Badge, Button, DemoDataBadge, EmptyState, ErrorState, Input } from ".";
 
 describe("Button", () => {
   it("calls its handler when clicked", async () => {
@@ -88,18 +88,3 @@ describe("state components", () => {
   });
 });
 
-describe("ComingSoon", () => {
-  it("states plainly that the module is not implemented", () => {
-    render(
-      <ComingSoon
-        module="Forecast Engine"
-        phase="Phase 5"
-        capabilities={["Congestion predictions", "Confidence from measured error"]}
-      />,
-    );
-
-    expect(screen.getByRole("heading", { name: "Forecast Engine" })).toBeInTheDocument();
-    expect(screen.getByText(/not implemented yet/i)).toBeInTheDocument();
-    expect(screen.getByText("Congestion predictions")).toBeInTheDocument();
-  });
-});

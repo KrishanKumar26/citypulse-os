@@ -8,40 +8,38 @@ import { useSession } from "@/lib/auth/session";
 /**
  * Primary navigation (PRD §8).
  *
- * Modules that are not built yet are still listed, because hiding the roadmap
- * would misrepresent the product's shape. They are visibly marked and lead to a
- * page that states what is missing — never to a broken screen or a control that
- * silently does nothing (PRD §30 of the execution prompt).
+ * Every item here is a module that exists and works. The rail carried an
+ * unbuilt one behind a "Soon" badge until the roadmap it advertised stopped
+ * being a plan — the Digital Twin needs a road network the platform has no
+ * source for, so it was removed rather than left promising something. A rail
+ * that lists what is not coming is no more honest than one that hides what is.
  *
- * `available` must match what the page actually does. These flags were written
- * in Phase 2 and not revisited as Phases 4 to 7 shipped, so Live Intelligence,
- * Forecast, the Simulator, AI Insights and Alerts all sat behind a "Soon" badge
- * while working and serving real data. The rule cuts both ways: claiming a
- * feature that does not exist and hiding one that does are the same failure,
- * and the second is the one that survived to the first deployment.
+ * That badge had already failed in the other direction: written in Phase 2 and
+ * not revisited, it left Live Intelligence, Forecast, the Simulator, AI Insights
+ * and Alerts marked "Soon" through Phases 4 to 7, while all five worked and
+ * served real data. Claiming a feature that does not exist and hiding one that
+ * does are the same failure, and the second is the one that survived to the
+ * first deployment.
  *
- * `permission` is the same rule applied to the signed-in user. A VIEWER holds
- * five permissions and saw all fifteen modules, every one of them a link to a
- * page that could only ever answer "You do not have permission" — navigation
- * that leads nowhere is indistinguishable, to the person clicking it, from a
- * product that is broken.
+ * `permission` applies the same rule to the signed-in account. A VIEWER holds
+ * five permissions and saw every module as a live link, most of which could only
+ * answer "You do not have permission" — navigation that leads nowhere is
+ * indistinguishable, to the person clicking it, from a product that is broken.
  *
- * Locked items stay visible rather than disappearing. Hiding them would leave
- * someone unable to discover a capability exists in order to ask for it, and it
- * is the same failure as the "Soon" badges: a rail that under-reports the
- * product. The lock says the feature is real and the account is not permitted,
- * which are different facts and should not look alike.
+ * Locked items stay visible rather than disappearing, so someone can discover a
+ * capability exists in order to ask for access. The lock says the feature is
+ * real and this account is not permitted; those are different facts from "not
+ * built", which is why nothing here says both.
  *
- * Each permission below is the one the page's own data actually requires, read
- * off the @PreAuthorize on the service behind it. This governs presentation
- * only — the API enforces the same permission independently.
+ * Each permission is the one the page's own data actually requires, read off the
+ * @PreAuthorize on the service behind it. This governs presentation only — the
+ * API enforces the same permission independently.
  */
 
 interface NavItem {
   label: string;
   href: string;
   icon: string;
-  available: boolean;
   /** Null where any signed-in user may open the page. */
   permission: string | null;
 }
@@ -50,46 +48,45 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
   {
     heading: "Overview",
     items: [
-      { label: "Command Center", href: "/command-center", icon: "grid", available: true, permission: "telemetry:read" },
-      { label: "Live Intelligence", href: "/live", icon: "activity", available: true, permission: "telemetry:read" },
+      { label: "Command Center", href: "/command-center", icon: "grid", permission: "telemetry:read" },
+      { label: "Live Intelligence", href: "/live", icon: "activity", permission: "telemetry:read" },
     ],
   },
   {
     heading: "Intelligence",
     items: [
-      { label: "AI Insights", href: "/insights", icon: "sparkle", available: true, permission: "analytics:read" },
-      { label: "Anomaly Detection", href: "/anomalies", icon: "pulse", available: true, permission: "anomaly:read" },
-      { label: "Forecast", href: "/forecast", icon: "trending", available: true, permission: "forecast:read" },
-      { label: "What-If Simulator", href: "/simulator", icon: "beaker", available: true, permission: "simulation:read" },
-      { label: "Digital Twin", href: "/digital-twin", icon: "layers", available: false, permission: null },
+      { label: "AI Insights", href: "/insights", icon: "sparkle", permission: "analytics:read" },
+      { label: "Anomaly Detection", href: "/anomalies", icon: "pulse", permission: "anomaly:read" },
+      { label: "Forecast", href: "/forecast", icon: "trending", permission: "forecast:read" },
+      { label: "What-If Simulator", href: "/simulator", icon: "beaker", permission: "simulation:read" },
     ],
   },
   {
     heading: "Operations",
     items: [
-      { label: "Alerts", href: "/alerts", icon: "bell", available: true, permission: "alert:read" },
-      { label: "Action Center", href: "/response-plans", icon: "check", available: true, permission: "alert:read" },
-      { label: "Impact", href: "/impact", icon: "target", available: true, permission: "telemetry:read" },
+      { label: "Alerts", href: "/alerts", icon: "bell", permission: "alert:read" },
+      { label: "Action Center", href: "/response-plans", icon: "check", permission: "alert:read" },
+      { label: "Impact", href: "/impact", icon: "target", permission: "telemetry:read" },
     ],
   },
   {
     heading: "Analytics",
     items: [
-      { label: "City Analytics", href: "/analytics", icon: "chart", available: true, permission: "telemetry:read" },
+      { label: "City Analytics", href: "/analytics", icon: "chart", permission: "telemetry:read" },
     ],
   },
   {
     heading: "Data",
     items: [
-      { label: "Data Sources", href: "/data-sources", icon: "database", available: true, permission: "telemetry:read" },
-      { label: "Data Health", href: "/data-health", icon: "shield", available: true, permission: "telemetry:read" },
-      { label: "API Management", href: "/api-keys", icon: "key", available: true, permission: null },
+      { label: "Data Sources", href: "/data-sources", icon: "database", permission: "telemetry:read" },
+      { label: "Data Health", href: "/data-health", icon: "shield", permission: "telemetry:read" },
+      { label: "API Management", href: "/api-keys", icon: "key", permission: null },
     ],
   },
   {
     heading: "System",
     items: [
-      { label: "Settings", href: "/settings", icon: "settings", available: true, permission: null },
+      { label: "Settings", href: "/settings", icon: "settings", permission: null },
     ],
   },
 ];
@@ -101,7 +98,6 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
 // someone has to remember to change.
 const ALL_ITEMS = NAV_SECTIONS.flatMap((section) => section.items);
 const TOTAL_COUNT = ALL_ITEMS.length;
-const AVAILABLE_COUNT = ALL_ITEMS.filter((item) => item.available).length;
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -179,14 +175,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                       )}
                       <NavIcon name={item.icon} />
                       <span className="flex-1 truncate">{item.label}</span>
-                      {!item.available && (
-                        <span
-                          className="rounded border border-line-default px-1 py-px text-[9px] font-medium uppercase tracking-wide text-content-disabled"
-                          title="Not implemented yet"
-                        >
-                          Soon
-                        </span>
-                      )}
                     </Link>
                   </li>
                 );
@@ -198,7 +186,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="border-t border-line-subtle px-5 py-3">
         <p className="text-[11px] text-content-disabled">
-          {AVAILABLE_COUNT} of {TOTAL_COUNT} modules built · demo data
+          {TOTAL_COUNT} modules · demo data
         </p>
         {lockedCount > 0 && (
           // Says why part of the rail is greyed. Without it a locked module is

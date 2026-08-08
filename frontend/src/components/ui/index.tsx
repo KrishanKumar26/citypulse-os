@@ -308,37 +308,6 @@ export function ErrorState({
   );
 }
 
-/**
- * Marks a module that is not built yet.
- *
- * PRD §30 of the execution prompt: no fake buttons, and no pretending a feature
- * works. Navigation to an unbuilt module lands here, which states plainly what
- * is missing and which phase delivers it.
- */
-export function ComingSoon({ module, phase, capabilities }: {
-  module: string;
-  phase: string;
-  capabilities: string[];
-}) {
-  return (
-    <div className="mx-auto max-w-lg px-6 py-16 text-center">
-      <Badge level="info">{phase}</Badge>
-      <h2 className="mt-4 text-lg font-semibold text-content-primary">{module}</h2>
-      <p className="mt-2 text-sm text-content-tertiary">
-        This module is not implemented yet. It is listed here so the roadmap is visible, not to
-        suggest working functionality.
-      </p>
-      <ul className="mt-6 space-y-2 text-left">
-        {capabilities.map((capability) => (
-          <li key={capability} className="flex items-start gap-2.5 text-[13px] text-content-secondary">
-            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-content-disabled" aria-hidden="true" />
-            {capability}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 /**
  * A measured quantity, presented so its weight matches its importance.

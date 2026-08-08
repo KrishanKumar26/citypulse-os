@@ -79,14 +79,13 @@ describe("Sidebar permission gating", () => {
     expect(screen.queryByText(/need permission your account lacks/i)).toBeNull();
   });
 
-  it("leaves an unbuilt module alone — Soon and locked are different facts", () => {
+  it("leaves a module open to everyone open, even with no permissions at all", () => {
     permissions = [];
     render(<Sidebar />);
 
-    // Digital Twin carries no permission: it is missing for everyone, which the
-    // Soon badge already says. A padlock there would blame the account for the
-    // roadmap.
-    expect(screen.getByText("Soon")).toBeInTheDocument();
-    expect(link("Digital Twin")).not.toBeNull();
+    // A null permission means any signed-in user may open the page. Locking
+    // these would blame the account for a restriction that does not exist.
+    expect(link("Settings")).not.toBeNull();
+    expect(link("API Management")).not.toBeNull();
   });
 });
