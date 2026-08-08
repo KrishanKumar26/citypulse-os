@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/components/ui";
+import { useSession } from "@/lib/auth/session";
 
 /**
  * Primary navigation (PRD §8).
@@ -18,6 +19,22 @@ import { cn } from "@/components/ui";
  * while working and serving real data. The rule cuts both ways: claiming a
  * feature that does not exist and hiding one that does are the same failure,
  * and the second is the one that survived to the first deployment.
+ *
+ * `permission` is the same rule applied to the signed-in user. A VIEWER holds
+ * five permissions and saw all fifteen modules, every one of them a link to a
+ * page that could only ever answer "You do not have permission" — navigation
+ * that leads nowhere is indistinguishable, to the person clicking it, from a
+ * product that is broken.
+ *
+ * Locked items stay visible rather than disappearing. Hiding them would leave
+ * someone unable to discover a capability exists in order to ask for it, and it
+ * is the same failure as the "Soon" badges: a rail that under-reports the
+ * product. The lock says the feature is real and the account is not permitted,
+ * which are different facts and should not look alike.
+ *
+ * Each permission below is the one the page's own data actually requires, read
+ * off the @PreAuthorize on the service behind it. This governs presentation
+ * only — the API enforces the same permission independently.
  */
 
 interface NavItem {
@@ -25,52 +42,54 @@ interface NavItem {
   href: string;
   icon: string;
   available: boolean;
+  /** Null where any signed-in user may open the page. */
+  permission: string | null;
 }
 
 const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
   {
     heading: "Overview",
     items: [
-      { label: "Command Center", href: "/command-center", icon: "grid", available: true },
-      { label: "Live Intelligence", href: "/live", icon: "activity", available: true },
+      { label: "Command Center", href: "/command-center", icon: "grid", available: true, permission: "telemetry:read" },
+      { label: "Live Intelligence", href: "/live", icon: "activity", available: true, permission: "telemetry:read" },
     ],
   },
   {
     heading: "Intelligence",
     items: [
-      { label: "AI Insights", href: "/insights", icon: "sparkle", available: true },
-      { label: "Anomaly Detection", href: "/anomalies", icon: "pulse", available: true },
-      { label: "Forecast", href: "/forecast", icon: "trending", available: true },
-      { label: "What-If Simulator", href: "/simulator", icon: "beaker", available: true },
-      { label: "Digital Twin", href: "/digital-twin", icon: "layers", available: false },
+      { label: "AI Insights", href: "/insights", icon: "sparkle", available: true, permission: "analytics:read" },
+      { label: "Anomaly Detection", href: "/anomalies", icon: "pulse", available: true, permission: "anomaly:read" },
+      { label: "Forecast", href: "/forecast", icon: "trending", available: true, permission: "forecast:read" },
+      { label: "What-If Simulator", href: "/simulator", icon: "beaker", available: true, permission: "simulation:read" },
+      { label: "Digital Twin", href: "/digital-twin", icon: "layers", available: false, permission: null },
     ],
   },
   {
     heading: "Operations",
     items: [
-      { label: "Alerts", href: "/alerts", icon: "bell", available: true },
-      { label: "Action Center", href: "/response-plans", icon: "check", available: true },
-      { label: "Impact", href: "/impact", icon: "target", available: true },
+      { label: "Alerts", href: "/alerts", icon: "bell", available: true, permission: "alert:read" },
+      { label: "Action Center", href: "/response-plans", icon: "check", available: true, permission: "alert:read" },
+      { label: "Impact", href: "/impact", icon: "target", available: true, permission: "telemetry:read" },
     ],
   },
   {
     heading: "Analytics",
     items: [
-      { label: "City Analytics", href: "/analytics", icon: "chart", available: true },
+      { label: "City Analytics", href: "/analytics", icon: "chart", available: true, permission: "telemetry:read" },
     ],
   },
   {
     heading: "Data",
     items: [
-      { label: "Data Sources", href: "/data-sources", icon: "database", available: true },
-      { label: "Data Health", href: "/data-health", icon: "shield", available: true },
-      { label: "API Management", href: "/api-keys", icon: "key", available: true },
+      { label: "Data Sources", href: "/data-sources", icon: "database", available: true, permission: "telemetry:read" },
+      { label: "Data Health", href: "/data-health", icon: "shield", available: true, permission: "telemetry:read" },
+      { label: "API Management", href: "/api-keys", icon: "key", available: true, permission: null },
     ],
   },
   {
     heading: "System",
     items: [
-      { label: "Settings", href: "/settings", icon: "settings", available: true },
+      { label: "Settings", href: "/settings", icon: "settings", available: true, permission: null },
     ],
   },
 ];
@@ -86,6 +105,15 @@ const AVAILABLE_COUNT = ALL_ITEMS.filter((item) => item.available).length;
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { can, user } = useSession();
+
+  // Before the profile arrives nothing is locked. Rendering every item as
+  // forbidden for the moment the session is restoring would flash a rail full
+  // of padlocks at a user who holds all of them.
+  const permitted = (item: NavItem) =>
+    user === null || item.permission === null || can(item.permission);
+
+  const lockedCount = user === null ? 0 : ALL_ITEMS.filter((i) => !permitted(i)).length;
 
   return (
     <nav aria-label="Main navigation" className="flex h-full w-60 shrink-0 flex-col border-r border-line-subtle bg-surface-raised">
@@ -106,6 +134,27 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const locked = !permitted(item);
+
+                if (locked) {
+                  // Not a link. A disabled-looking link that still navigates is
+                  // worse than either state on its own, and the destination
+                  // would only render the API's refusal.
+                  return (
+                    <li key={item.href}>
+                      <span
+                        aria-disabled="true"
+                        title={`Requires ${item.permission} — your account does not have it`}
+                        className="flex cursor-not-allowed items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2 text-[13px] text-content-disabled"
+                      >
+                        <NavIcon name={item.icon} />
+                        <span className="flex-1 truncate">{item.label}</span>
+                        <LockIcon />
+                      </span>
+                    </li>
+                  );
+                }
+
                 return (
                   <li key={item.href}>
                     <Link
@@ -151,6 +200,13 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <p className="text-[11px] text-content-disabled">
           {AVAILABLE_COUNT} of {TOTAL_COUNT} modules built · demo data
         </p>
+        {lockedCount > 0 && (
+          // Says why part of the rail is greyed. Without it a locked module is
+          // indistinguishable from a broken one.
+          <p className="mt-0.5 text-[11px] text-content-disabled">
+            {lockedCount} need permission your account lacks
+          </p>
+        )}
       </div>
     </nav>
   );
@@ -189,6 +245,15 @@ function NavIcon({ name }: { name: string }) {
       className="shrink-0"
     >
       <path d={paths[name] ?? paths.grid} />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="10.5" width="16" height="10.5" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M8 10.5V7a4 4 0 118 0v3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
