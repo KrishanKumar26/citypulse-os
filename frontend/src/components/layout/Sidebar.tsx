@@ -62,7 +62,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
     items: [
       { label: "Data Sources", href: "/data-sources", icon: "database", available: true },
       { label: "Data Health", href: "/data-health", icon: "shield", available: true },
-      { label: "API Management", href: "/api-keys", icon: "key", available: false },
+      { label: "API Management", href: "/api-keys", icon: "key", available: true },
     ],
   },
   {

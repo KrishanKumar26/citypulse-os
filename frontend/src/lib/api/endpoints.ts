@@ -1,5 +1,8 @@
 import { api } from "./client";
 import type {
+  ApiKeyCreated,
+  ApiKeySummary,
+  ScopeCatalogue,
   DataSourceList,
   PipelineHealth,
   CityHistory,
@@ -74,6 +77,15 @@ export const dataSourceApi = {
 
   /** Pipeline quality: what arrived against what was kept. */
   health: () => api.get<PipelineHealth>("/api/v1/data-sources/health"),
+};
+
+export const apiKeyApi = {
+  list: () => api.get<ApiKeySummary[]>("/api/v1/api-keys"),
+  scopes: () => api.get<ScopeCatalogue>("/api/v1/api-keys/scopes"),
+  create: (body: { name: string; description?: string; scopes: string[]; expiresInDays?: number }) =>
+    api.post<ApiKeyCreated>("/api/v1/api-keys", body),
+  /** Reason is optional and the endpoint accepts a bodyless DELETE. */
+  revoke: (keyId: string) => api.delete<ApiKeySummary>(`/api/v1/api-keys/${keyId}`),
 };
 
 export const platformApi = {

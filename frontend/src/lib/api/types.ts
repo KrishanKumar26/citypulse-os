@@ -675,3 +675,32 @@ export interface PipelineHealth {
   silentSources: number;
   totalSources: number;
 }
+
+export interface ApiKeySummary {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Identifies a key without revealing it. Not a credential. */
+  keyPrefix: string;
+  scopes: string[];
+  owner: string;
+  createdAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  revokedReason: string | null;
+  /** Null when never used — different from used long ago. */
+  lastUsedAt: string | null;
+  active: boolean;
+  inactiveReason: string | null;
+}
+
+export interface ApiKeyCreated {
+  key: ApiKeySummary;
+  /** The only time this is returned. Nothing stores it. */
+  secret: string;
+}
+
+export interface ScopeCatalogue {
+  /** Exactly the permissions the caller holds and may therefore grant. */
+  grantable: string[];
+}
