@@ -158,6 +158,12 @@ export interface ZoneCondition {
 
   aqi: number | null;
   aqiCategory: string | null;
+  /**
+   * True when this AQI came from an instrument, false when it was generated,
+   * null when there is no AQI. Three states, not two: "not measured" must not
+   * render as "synthetic".
+   */
+  aqiMeasured: boolean | null;
 
   temperatureC: string | null;
   precipitationMmH: string | null;

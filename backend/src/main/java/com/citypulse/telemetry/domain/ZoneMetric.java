@@ -69,6 +69,15 @@ public class ZoneMetric {
     @Column(name = "aqi_category")
     private String aqiCategory;
 
+    /**
+     * Whether this window's AQI was measured or generated. Boxed on purpose:
+     * null is a third answer, "the window has no AQI", and a primitive would
+     * turn that into FALSE — reporting a generated reading where there is no
+     * reading at all.
+     */
+    @Column(name = "aqi_measured")
+    private Boolean aqiMeasured;
+
     // --- Weather -------------------------------------------------------------
 
     @Column(name = "temperature_c")

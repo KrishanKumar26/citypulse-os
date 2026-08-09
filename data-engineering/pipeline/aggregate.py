@@ -121,7 +121,15 @@ def aggregate(
         # vehicles observed in its interval, so the window total is their sum.
         vehicles = sum(int(e["vehicle_count"]) for e in traffic_rows) if traffic_rows else None
 
-        aqi = round(mean(float(e["aqi"]) for e in air_rows)) if air_rows else None
+        # Measured readings are used alone when any exist, never averaged with
+        # generated ones. The mean of an instrument and a simulation is neither
+        # — it cannot be pointed at, and it would be labelled "measured" on the
+        # strength of the half that was. A zone with no station keeps its
+        # generated AQI and says so.
+        measured_air = [e for e in air_rows if e.get("demo_data") is False]
+        contributing_air = measured_air or air_rows
+        aqi = round(mean(float(e["aqi"]) for e in contributing_air)) if contributing_air else None
+        aqi_measured = bool(measured_air) if contributing_air else None
         temperature = mean(float(e["temperature_c"]) for e in weather_rows) if weather_rows else None
         precipitation = (
             mean(float(e["precipitation_mm_h"]) for e in weather_rows) if weather_rows else None
@@ -175,7 +183,15 @@ def aggregate(
             "risk_score": score,
             "risk_level": risk_level(score),
             "sample_count": len(traffic_rows) + len(air_rows) + len(weather_rows),
-            "demo_data": True,
+            "aqi_measured": aqi_measured,
+            # A window is demo data unless every reading behind it was measured.
+            # Written as a fact about the inputs rather than a constant: it was
+            # hardcoded TRUE, which was correct only for as long as every feed
+            # was generated, and stopped being correct the moment one was not.
+            "demo_data": any(
+                e.get("demo_data", True)
+                for e in (*traffic_rows, *contributing_air, *weather_rows)
+            ) or not (traffic_rows or contributing_air or weather_rows),
         })
 
     if stats is not None:

@@ -198,7 +198,14 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
     ["Environment", [
       [
         "Air quality",
-        condition.aqi != null ? `${condition.aqi} (${condition.aqiCategory ?? "—"})` : "Not measured",
+        // Provenance sits with the number, not in a page-level badge: on this
+        // deployment a zone near a CPCB station reads an instrument while the
+        // zone beside it reads the generator, and a banner cannot say that.
+        condition.aqi != null
+          ? `${condition.aqi} (${condition.aqiCategory ?? "—"}) · ${
+              condition.aqiMeasured ? "measured" : "synthetic"
+            }`
+          : "Not measured",
       ],
       [
         "Weather",

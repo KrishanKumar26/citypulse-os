@@ -237,3 +237,71 @@ def test_stats_are_optional():
     # be a condition of the function working.
     rows = aggregate([traffic(0)], zone_ids=ZONE_IDS, zone_city=ZONE_CITY, window=WINDOW)
     assert len(rows) == 1
+
+
+class TestAirProvenance:
+    """A measured AQI and a generated one must not become the same number.
+
+    CPCB stations sit at fixed points and `ingest.cpcb` refuses to attribute one
+    beyond its distance limit, so on any real deployment most zones have no
+    station and keep generated air. These tests pin the two halves of that: the
+    covered zone reports an instrument, the uncovered one reports the generator,
+    and neither is described as the other.
+    """
+
+    def test_generated_air_is_marked_generated(self) -> None:
+        rows = run([traffic(0), air(0, aqi=120)])
+        assert rows[0]["aqi"] == 120
+        assert rows[0]["aqi_measured"] is False
+
+    def test_measured_air_is_marked_measured(self) -> None:
+        measured = air(0, aqi=200)
+        measured["demo_data"] = False
+        rows = run([traffic(0), measured])
+        assert rows[0]["aqi"] == 200
+        assert rows[0]["aqi_measured"] is True
+
+    def test_a_measurement_is_never_averaged_with_a_simulation(self) -> None:
+        # The mean of 200 and 100 is 150, which no instrument reported and no
+        # generator produced. Taking it and calling the window measured would be
+        # the most convincing possible way to be wrong.
+        measured = air(0, aqi=200)
+        measured["demo_data"] = False
+        rows = run([traffic(0), measured, air(1, aqi=100)])
+        assert rows[0]["aqi"] == 200
+        assert rows[0]["aqi_measured"] is True
+
+    def test_several_measurements_are_averaged_with_each_other(self) -> None:
+        first, second = air(0, aqi=200), air(1, aqi=210)
+        first["demo_data"] = second["demo_data"] = False
+        rows = run([traffic(0), first, second])
+        assert rows[0]["aqi"] == 205
+        assert rows[0]["aqi_measured"] is True
+
+    def test_no_air_at_all_is_neither(self) -> None:
+        # Null, not False: "nothing was measured here" and "this number was
+        # invented" are different facts, and a window with no AQI has no
+        # provenance to report.
+        rows = run([traffic(0)])
+        assert rows[0]["aqi"] is None
+        assert rows[0]["aqi_measured"] is None
+
+    def test_an_uncovered_zone_keeps_generated_air(self) -> None:
+        # The station covers WHF; KOR is out of range and must be unaffected.
+        measured = air(0, zone="BLR-WHF", aqi=200)
+        measured["demo_data"] = False
+        rows = run([traffic(0, zone="BLR-WHF"), measured,
+                    traffic(0, zone="BLR-KOR"), air(0, zone="BLR-KOR", aqi=90)])
+        by_zone = {r["zone_code"]: r for r in rows}
+        assert by_zone["BLR-WHF"]["aqi_measured"] is True
+        assert by_zone["BLR-KOR"]["aqi_measured"] is False
+        assert by_zone["BLR-KOR"]["aqi"] == 90
+
+    def test_the_window_stays_demo_while_traffic_is_generated(self) -> None:
+        # Real air does not make the window real. Traffic is still invented, and
+        # a city with measured air and synthetic traffic is exactly that.
+        measured = air(0, aqi=200)
+        measured["demo_data"] = False
+        rows = run([traffic(0), measured])
+        assert rows[0]["demo_data"] is True
+        assert rows[0]["aqi_measured"] is True

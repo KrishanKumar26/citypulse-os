@@ -49,6 +49,7 @@ from psycopg.rows import dict_row  # noqa: E402
 
 from common.db import execute_batched  # noqa: E402
 from ingest.cpcb_aqi import compute  # noqa: E402
+from pipeline.measured_air import overlay  # noqa: E402
 
 # The live CPCB resource on data.gov.in.
 RESOURCE_ID = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
@@ -250,8 +251,15 @@ def main() -> int:
                     "UPDATE data_sources SET last_ingested_at = now() WHERE id = %s", (source_id,))
             connection.commit()
 
+            # The curated windows covering these readings were built before the
+            # readings arrived, from generated air. Written to the raw table and
+            # left there, a measurement is something nothing reads: the
+            # dashboard reads zone_metrics.
+            overlaid = overlay(connection)
+
     print(f"  {matched} stations within {MAX_STATION_KM} km of a monitored zone")
     print(f"  {len(rows)} real readings written (demo_data = false)")
+    print(f"  {overlaid if rows else 0} curated windows now report measured air")
     return 0
 
 

@@ -309,6 +309,7 @@ def write_zone_metrics(connection: psycopg.Connection, windows: Sequence[dict]) 
             w.get("active_incidents", 0), w.get("active_events", 0),
             w.get("risk_score"), w.get("risk_level"),
             w.get("sample_count", 0), w.get("demo_data", True),
+            w.get("aqi_measured"),
         )
         for w in windows
     ]
@@ -319,8 +320,8 @@ def write_zone_metrics(connection: psycopg.Connection, windows: Sequence[dict]) 
             (zone_id, window_start, window_end, vehicle_count, average_speed_kph,
              occupancy_ratio, congestion_level, aqi, aqi_category, temperature_c,
              precipitation_mm_h, weather_condition, active_incidents, active_events,
-             risk_score, risk_level, sample_count, demo_data)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             risk_score, risk_level, sample_count, demo_data, aqi_measured)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (zone_id, window_start, window_end) DO UPDATE SET
             vehicle_count      = EXCLUDED.vehicle_count,
             average_speed_kph  = EXCLUDED.average_speed_kph,
@@ -336,6 +337,8 @@ def write_zone_metrics(connection: psycopg.Connection, windows: Sequence[dict]) 
             risk_score         = EXCLUDED.risk_score,
             risk_level         = EXCLUDED.risk_level,
             sample_count       = EXCLUDED.sample_count,
+            demo_data          = EXCLUDED.demo_data,
+            aqi_measured       = EXCLUDED.aqi_measured,
             computed_at        = now()
         """,
         rows,

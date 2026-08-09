@@ -47,6 +47,13 @@ public final class TelemetryResponses {
             Integer aqi,
             String aqiCategory,
 
+            @Schema(description = "TRUE when this AQI came from an instrument (CPCB), FALSE when "
+                    + "it was generated, null when the window has no AQI at all. Separate from "
+                    + "demoData because a zone can have measured air and generated traffic, and "
+                    + "one flag cannot say both. Stations are at fixed points and none is "
+                    + "attributed beyond its distance limit, so most zones read FALSE.")
+            Boolean aqiMeasured,
+
             BigDecimal temperatureC,
             BigDecimal precipitationMmH,
             String weatherCondition,
