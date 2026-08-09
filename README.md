@@ -7,6 +7,12 @@ turns it into curated conditions, forecasts where those conditions are heading,
 lets an operator test hypothetical scenarios against them, and flags departures
 from what a place normally does.
 
+**Live: <https://citypulse-os-two.vercel.app>** — sign up and every module opens.
+The backend sleeps after fifteen minutes of quiet, so a cold first load takes
+about a minute while the JVM starts; that is the free tier, not a fault. A
+scheduled job reloads telemetry hourly, so the dashboard is never more than an
+hour behind itself.
+
 Built to the product requirements in [`docs/PRD.md`](docs/PRD.md). Phases 0–7 of
 [the plan](docs/DEVELOPMENT_PLAN.md) are complete and verified. Phase 8 (CI,
 containers, deployment) has not been started. Several Phase 9 surfaces have
@@ -246,8 +252,18 @@ Stated here rather than left to be discovered:
 - **Two of the five forecast targets are deliberately absent.** Crowd intensity
   has no sensor, and air quality is measured too sparsely at this grain to
   forecast honestly. Both are explained in [ML.md](docs/ML.md) §1.
-- **Nothing is deployed.** Phase 8 covers CI, container builds and cloud
-  deployment, and has not been done.
+- **Phase 8 is not finished, though a deployment exists.** CI runs on every
+  push — lint, tests, secret and dependency scanning, image builds, and a
+  compose smoke test — and the free-tier deployment above is live. What the
+  phase actually specifies is not: infrastructure as code on AWS, secrets from
+  Secrets Manager, dashboards and alerting, and a load test. Render, Vercel and
+  Neon were reached for because they cost nothing, not because they satisfy
+  that list.
+- **The deployed backend sleeps.** Render stops a free service after fifteen
+  minutes without traffic, and the next request waits roughly a minute for the
+  JVM. Opening the dashboard cold looks like a hang. There is deliberately no
+  keep-warm job: pinging every ten minutes would spend more than the entire
+  free Actions allowance on pings.
 
 ---
 
