@@ -104,6 +104,76 @@ class DataSourceIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("gives every feed one of the three provenances, and pairs it with demoData")
+    void labelsProvenance() throws Exception {
+        Tokens tokens = loginAs("sources-provenance@example.com", RoleName.CITY_OPERATOR);
+
+        JsonNode sources = objectMapper.readTree(mockMvc.perform(get("/api/v1/data-sources")
+                        .header("Authorization", "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString())
+                .path("data").path("sources");
+
+        // demoData asks only whether this platform invented the row, so the two
+        // real provenances answer it identically. The pairing that must hold is
+        // the other direction: nothing generated may claim to be measured or
+        // modelled, and nothing real may be flagged as demo data.
+        for (JsonNode source : sources) {
+            String provenance = source.path("provenance").asText();
+            assertThat(provenance)
+                    .as("%s must declare a provenance", source.path("code").asText())
+                    .isIn("MEASURED", "MODELLED", "SYNTHETIC");
+            assertThat(source.path("demoData").asBoolean())
+                    .as("%s is %s, so demoData must be %s",
+                            source.path("code").asText(), provenance, "SYNTHETIC".equals(provenance))
+                    .isEqualTo("SYNTHETIC".equals(provenance));
+        }
+
+        // All three exist, so this cannot pass by having only one kind of feed.
+        assertThat(sources).anySatisfy(s ->
+                assertThat(s.path("provenance").asText()).isEqualTo("SYNTHETIC"));
+        assertThat(sources).anySatisfy(s ->
+                assertThat(s.path("provenance").asText()).isEqualTo("MEASURED"));
+        assertThat(sources).anySatisfy(s ->
+                assertThat(s.path("provenance").asText()).isEqualTo("MODELLED"));
+    }
+
+    @Test
+    @DisplayName("carries the credits the real feeds' licences require")
+    void carriesAttribution() throws Exception {
+        Tokens tokens = loginAs("sources-attribution@example.com", RoleName.CITY_OPERATOR);
+
+        JsonNode sources = objectMapper.readTree(mockMvc.perform(get("/api/v1/data-sources")
+                        .header("Authorization", "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString())
+                .path("data").path("sources");
+
+        for (JsonNode source : sources) {
+            JsonNode attribution = source.path("attribution");
+            assertThat(attribution.isArray())
+                    .as("%s must carry an attribution list, empty if it owes none",
+                            source.path("code").asText())
+                    .isTrue();
+
+            if ("SYNTHETIC".equals(source.path("provenance").asText())) {
+                // This platform's own output credits nobody.
+                assertThat(attribution).isEmpty();
+            } else {
+                // WAQI's terms make attribution mandatory and Open-Meteo's data
+                // is CC BY 4.0, so a real feed reaching the client with no
+                // credit would put the deployment outside the terms it accepted
+                // by fetching the data. A name is required; a URL is not, since
+                // some agencies are named in a response without one.
+                assertThat(attribution).isNotEmpty();
+                for (JsonNode credit : attribution) {
+                    assertThat(credit.path("name").asText()).isNotBlank();
+                }
+            }
+        }
+    }
+
+    @Test
     @DisplayName("requires authentication")
     void requiresAuth() throws Exception {
         mockMvc.perform(get("/api/v1/data-sources")).andExpect(status().isUnauthorized());

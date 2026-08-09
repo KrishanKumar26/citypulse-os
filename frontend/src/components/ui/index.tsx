@@ -207,13 +207,19 @@ export function Badge({
   level = "neutral",
   children,
   className,
+  title,
 }: {
   level?: StatusLevel;
   children: ReactNode;
   className?: string;
+  /** Long form of a badge that has to stay one word. Rendered as the native
+      tooltip, so it supplements the label rather than carrying meaning the
+      label lacks — a reader who never hovers still gets the state. */
+  title?: string;
 }) {
   return (
     <span
+      title={title}
       className={cn(
         "inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[11px] font-medium",
         BADGE_STYLES[level],

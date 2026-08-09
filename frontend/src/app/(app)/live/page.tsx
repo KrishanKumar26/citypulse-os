@@ -20,6 +20,7 @@ import { ZONE_TYPE_LABELS } from "@/components/map/ZoneMap";
 import type { ConditionLevel, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
 import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
+import { describeAqi } from "@/lib/provenance";
 
 const ZoneMap = dynamic(() => import("@/components/map/ZoneMap"), {
   ssr: false,
@@ -199,13 +200,9 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
       [
         "Air quality",
         // Provenance sits with the number, not in a page-level badge: on this
-        // deployment a zone near a CPCB station reads an instrument while the
-        // zone beside it reads the generator, and a banner cannot say that.
-        condition.aqi != null
-          ? `${condition.aqi} (${condition.aqiCategory ?? "—"}) · ${
-              condition.aqiMeasured ? "measured" : "synthetic"
-            }`
-          : "Not measured",
+        // deployment a zone near a monitoring station reads an instrument while
+        // the zone beside it reads a model, and a banner cannot say that.
+        describeAqi(condition.aqi, condition.aqiCategory, condition.aqiSource),
       ],
       [
         "Weather",

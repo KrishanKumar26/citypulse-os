@@ -70,13 +70,19 @@ public class ZoneMetric {
     private String aqiCategory;
 
     /**
-     * Whether this window's AQI was measured or generated. Boxed on purpose:
-     * null is a third answer, "the window has no AQI", and a primitive would
-     * turn that into FALSE — reporting a generated reading where there is no
-     * reading at all.
+     * Where this window's AQI came from: {@code MEASURED} (an instrument),
+     * {@code MODELLED} (Copernicus CAMS) or {@code SYNTHETIC} (generated).
+     *
+     * <p>Nullable, and null is a fourth answer rather than a missing one: the
+     * window has no AQI at all. "Not measured" must not render as "generated".
+     *
+     * <p>Three values rather than the boolean this replaced, because a model of
+     * the real atmosphere is neither an instrument nor an invention. Collapsing
+     * it either way loses the distinction that matters most to a reader
+     * deciding how much to trust the number.
      */
-    @Column(name = "aqi_measured")
-    private Boolean aqiMeasured;
+    @Column(name = "aqi_source")
+    private String aqiSource;
 
     // --- Weather -------------------------------------------------------------
 

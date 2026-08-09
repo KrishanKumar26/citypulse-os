@@ -33,7 +33,7 @@ from common.validation import (  # noqa: E402
     validate,
 )
 from generator import catalog as catalog_module  # noqa: E402
-from pipeline import loader, measured_air  # noqa: E402
+from pipeline import air_provenance, loader  # noqa: E402
 from pipeline.aggregate import DEFAULT_WINDOW, aggregate  # noqa: E402
 
 
@@ -161,11 +161,11 @@ def main(argv: list[str] | None = None) -> int:
         connection.commit()
 
         # A generated batch recomputes every window it covers, which would
-        # overwrite a measured AQI with the invented one for the same hour. The
-        # measurement is still in the raw table, so it is re-applied rather than
+        # overwrite a real AQI with the invented one for the same hour. The real
+        # reading is still in the raw table, so it is re-applied rather than
         # lost — and the overlay is idempotent, so doing this every run is free.
-        transform_stats["measured_air_windows"] = measured_air.overlay(
-            connection, since=earliest, window=window
+        transform_stats["real_air_windows"] = air_provenance.overlay(
+            connection, since=earliest
         )
 
         if earliest and latest:

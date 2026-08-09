@@ -133,6 +133,17 @@ export interface PlatformInfo {
 export type ConditionLevel = "NORMAL" | "MODERATE" | "HIGH" | "CRITICAL";
 
 /**
+ * What kind of thing produced a number.
+ *
+ * `MODELLED` is neither of the other two and must not be collapsed into either.
+ * Copernicus CAMS solves a physical model of the real atmosphere, so its output
+ * moves with conditions that genuinely occurred — but no instrument stood in
+ * the zone, and a reader deciding how far to trust the figure needs to know
+ * which of those two things they are looking at.
+ */
+export type AirProvenance = "MEASURED" | "MODELLED" | "SYNTHETIC";
+
+/**
  * Latest curated conditions for one zone.
  *
  * Every metric is nullable, and `hasData` distinguishes "measured as zero" from
@@ -159,11 +170,10 @@ export interface ZoneCondition {
   aqi: number | null;
   aqiCategory: string | null;
   /**
-   * True when this AQI came from an instrument, false when it was generated,
-   * null when there is no AQI. Three states, not two: "not measured" must not
-   * render as "synthetic".
+   * Where this AQI came from. Null is a fourth state, not a missing one: the
+   * window has no AQI, and "not measured" must not render as "synthetic".
    */
-  aqiMeasured: boolean | null;
+  aqiSource: AirProvenance | null;
 
   temperatureC: string | null;
   precipitationMmH: string | null;
@@ -648,6 +658,17 @@ export interface DataSourceSummary {
   /** ACTIVE but delivering nothing: configured to run and not running. */
   silent: boolean;
   demoData: boolean;
+  provenance: AirProvenance;
+  /** Credits this feed's licence requires be displayed. Empty for generated
+      feeds, which are this platform's own output and owe no credit. */
+  attribution: Attribution[];
+}
+
+/** A credit a provider's terms require be shown wherever their data is. */
+export interface Attribution {
+  name: string;
+  /** May be empty — some agencies are named without a link. */
+  url: string;
 }
 
 export interface DataSourceList {

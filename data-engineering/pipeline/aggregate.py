@@ -24,6 +24,37 @@ from common.transforms import (
 
 DEFAULT_WINDOW = timedelta(minutes=5)
 
+#: Best air first. Kept as a literal rather than imported from
+#: pipeline.air_provenance so this module stays pure — it is the one piece of
+#: the pipeline both Spark and the local runner execute, and it must not pull in
+#: psycopg to fold a batch of dictionaries.
+PRECEDENCE = ("MEASURED", "MODELLED", "SYNTHETIC")
+
+
+def _provenance(event: dict) -> str:
+    """Where one air reading came from.
+
+    An event may say so outright. One that does not is read from `demo_data`,
+    which is the only thing the generator's own events carry: TRUE is this
+    platform inventing a number, and FALSE — on this path — is the historical
+    shape of a measured reading, from before a model was a third possibility.
+    Real feeds do not travel this path at all; they are written straight to
+    `air_quality_events` and applied by `pipeline.air_provenance`, which reads
+    the provenance from the source rather than inferring it.
+    """
+    label = event.get("provenance")
+    if label in PRECEDENCE:
+        return label
+    return "SYNTHETIC" if event.get("demo_data", True) is not False else "MEASURED"
+
+
+def _best_provenance(air_rows: list[dict]) -> list[dict]:
+    """The subset of readings with the best provenance any of them has."""
+    if not air_rows:
+        return []
+    best = min(PRECEDENCE.index(_provenance(e)) for e in air_rows)
+    return [e for e in air_rows if PRECEDENCE.index(_provenance(e)) == best]
+
 
 def _parse(value: Any) -> datetime | None:
     if isinstance(value, datetime):
@@ -121,15 +152,13 @@ def aggregate(
         # vehicles observed in its interval, so the window total is their sum.
         vehicles = sum(int(e["vehicle_count"]) for e in traffic_rows) if traffic_rows else None
 
-        # Measured readings are used alone when any exist, never averaged with
-        # generated ones. The mean of an instrument and a simulation is neither
-        # — it cannot be pointed at, and it would be labelled "measured" on the
-        # strength of the half that was. A zone with no station keeps its
-        # generated AQI and says so.
-        measured_air = [e for e in air_rows if e.get("demo_data") is False]
-        contributing_air = measured_air or air_rows
+        # Only the best provenance present contributes, and the others are not
+        # averaged in. The mean of an instrument and a simulation is neither —
+        # it cannot be pointed at, and it would carry the label of the better
+        # half. A zone with no real reading keeps its generated AQI and says so.
+        contributing_air = _best_provenance(air_rows)
         aqi = round(mean(float(e["aqi"]) for e in contributing_air)) if contributing_air else None
-        aqi_measured = bool(measured_air) if contributing_air else None
+        aqi_source = _provenance(contributing_air[0]) if contributing_air else None
         temperature = mean(float(e["temperature_c"]) for e in weather_rows) if weather_rows else None
         precipitation = (
             mean(float(e["precipitation_mm_h"]) for e in weather_rows) if weather_rows else None
@@ -183,7 +212,7 @@ def aggregate(
             "risk_score": score,
             "risk_level": risk_level(score),
             "sample_count": len(traffic_rows) + len(air_rows) + len(weather_rows),
-            "aqi_measured": aqi_measured,
+            "aqi_source": aqi_source,
             # A window is demo data unless every reading behind it was measured.
             # Written as a fact about the inputs rather than a constant: it was
             # hardcoded TRUE, which was correct only for as long as every feed

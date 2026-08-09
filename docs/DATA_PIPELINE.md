@@ -150,6 +150,7 @@ Derived per window, in `common/transforms.py`:
 | `congestion_level` | Occupancy bands: ≤0.55 NORMAL, ≤0.80 MODERATE, ≤1.00 HIGH, above CRITICAL |
 | `average_speed_kph` | BPR curve over occupancy |
 | `aqi_category` | CPCB bands |
+| `aqi_source` | `MEASURED`, `MODELLED` or `SYNTHETIC` — see below |
 | `risk_score` | Weighted composite: congestion 0.40, incidents 0.25, air 0.20, weather 0.15 |
 | `risk_level` | The same four-state scale as congestion |
 
@@ -157,6 +158,37 @@ Derived per window, in `common/transforms.py`:
 zone with traffic but no air-quality feed scores on what it has rather than being
 penalised for the gap. A zone with nothing measured returns `null` — it is
 unknown, not low risk.
+
+### Real air arrives after the window it belongs to
+
+Generated feeds travel event → window → `zone_metrics` in one pass, because the
+aggregator sees them in the batch it is given. The two real air feeds do not:
+`ingest/waqi.py` and `ingest/open_meteo.py` run on their own schedule and write
+straight to `air_quality_events`, so the curated windows covering those readings
+were already built, from generated air, before the real ones arrived.
+
+`pipeline/air_provenance.py` closes that gap. For each curated window it finds
+the best provenance covering it, replaces the AQI and its band outright, records
+which of the three it is, and recomputes `risk_score` — risk is derived from AQI
+among other things, so changing one without the other would leave a window whose
+displayed air and displayed risk disagree about what the air was.
+
+Three properties are load-bearing:
+
+- **Ranked, never averaged.** `MEASURED` beats `MODELLED` beats `SYNTHETIC`, and
+  only the winning tier contributes to the mean. Two stations covering the same
+  zone are averaged with each other; a station and a model never are.
+- **Ranked by kind, not recency.** A station reading from the top of the hour
+  beats a CAMS value from thirty minutes ago. Provenance answers *what sort of
+  thing produced this*, and a fresher model output is still a model output.
+- **Carried forward, then expired.** Both feeds publish hourly against
+  five-minute windows, so a reading covers the windows after it for one hour and
+  then stops. Carrying it indefinitely would report a feed that went quiet last
+  night as though the instrument were still speaking.
+
+The overlay is idempotent, so the hourly refresh — which regenerates the last
+three hours and would otherwise bury the real readings under invented ones —
+simply re-applies it after every load.
 
 ### A rounding defect worth recording
 

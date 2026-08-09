@@ -7,8 +7,12 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A feed the platform ingests from (PRD §19, §43).
@@ -66,4 +70,32 @@ public class DataSource extends BaseEntity {
 
     @Column(name = "demo_data", nullable = false)
     private boolean demoData = true;
+
+    /**
+     * What kind of thing produced this feed's numbers: {@code MEASURED} (an
+     * instrument), {@code MODELLED} (a physical model of the real atmosphere)
+     * or {@code SYNTHETIC} (this platform's generator).
+     *
+     * <p>Held on the source rather than on each reading because a source's kind
+     * does not vary row by row — a monitoring station cannot emit a modelled
+     * value and CAMS cannot emit a measured one. Per-row it could disagree with
+     * itself, and there would be no rule for which copy to believe.
+     *
+     * <p>Distinct from {@link #demoData}, which asks only whether this platform
+     * invented the row. Both real feeds answer that the same way and differ
+     * here, which is exactly the distinction a reader needs.
+     */
+    @Column(name = "provenance", nullable = false, length = 16)
+    private String provenance = "SYNTHETIC";
+
+    /**
+     * Credits this feed's licence requires be shown wherever its data is.
+     *
+     * <p>Written by the ingester from the provider's own response, so it names
+     * the agencies behind the readings actually held. Empty for the generated
+     * feeds, which are this platform's own output and owe no credit.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "attribution", nullable = false)
+    private List<Attribution> attribution = new ArrayList<>();
 }

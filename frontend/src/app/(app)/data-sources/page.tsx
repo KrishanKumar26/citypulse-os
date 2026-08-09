@@ -13,6 +13,7 @@ import {
 } from "@/components/ui";
 import { dataSourceApi } from "@/lib/api/endpoints";
 import type { DataSourceSummary } from "@/lib/api/types";
+import { PROVENANCE_DETAIL, PROVENANCE_LABEL, provenanceLevel } from "@/lib/provenance";
 
 /**
  * Where the numbers came from.
@@ -101,6 +102,7 @@ export default function DataSourcesPage() {
                     <th scope="col" className="px-4 py-2.5 font-medium">Source</th>
                     <th scope="col" className="px-4 py-2.5 font-medium">Type</th>
                     <th scope="col" className="px-4 py-2.5 font-medium">Mode</th>
+                    <th scope="col" className="px-4 py-2.5 font-medium">Provenance</th>
                     <th scope="col" className="px-4 py-2.5 font-medium">Status</th>
                     <th scope="col" className="px-4 py-2.5 text-right font-medium">
                       Rows / {data.windowHours}h
@@ -117,11 +119,15 @@ export default function DataSourcesPage() {
             </div>
           </Card>
 
+          <Attributions sources={data.sources} />
+
           <p className="text-[11.5px] leading-relaxed text-content-tertiary">
-            Every feed here is synthetic, and labelled so. That is the platform&rsquo;s design
-            rather than a gap: it runs with no external API, so the pipeline, the models and the
-            dashboard can be exercised end to end without depending on a third party&rsquo;s
-            availability or terms. Nothing on this page is presented as a real municipal feed.
+            Traffic, weather, incidents and city events are synthetic, and labelled so. That is
+            the platform&rsquo;s design rather than a gap: it runs with no external API at all, so
+            the pipeline, the models and the dashboard can be exercised end to end without
+            depending on a third party&rsquo;s availability or terms. Air quality is the exception
+            — where a real feed covers a zone it replaces the generated reading outright, never
+            averages with it, and every figure in the product carries which of the three it is.
           </p>
         </>
       )}
@@ -142,6 +148,11 @@ function Row({ source }: { source: DataSourceSummary }) {
       </td>
       <td className="px-4 py-2.5">
         <span className="text-content-secondary">{source.ingestionMode.toLowerCase()}</span>
+      </td>
+      <td className="px-4 py-2.5">
+        <Badge level={provenanceLevel(source.provenance)} title={PROVENANCE_DETAIL[source.provenance]}>
+          {PROVENANCE_LABEL[source.provenance]}
+        </Badge>
       </td>
       <td className="px-4 py-2.5">
         {source.silent ? (
@@ -167,6 +178,58 @@ function Row({ source }: { source: DataSourceSummary }) {
         )}
       </td>
     </tr>
+  );
+}
+
+/**
+ * Credits the real feeds' licences require.
+ *
+ * Not optional and not decorative. WAQI's terms make attribution to the project
+ * and to the originating agency mandatory, and Open-Meteo's data is CC BY 4.0,
+ * so a deployment that displayed these readings without this block would be
+ * using them outside the terms it accepted by fetching them.
+ *
+ * Rendered from what each source reports rather than from a constant here: the
+ * originating agency differs per station, so the honest list is the one the
+ * ingester wrote from the responses behind the readings actually held. A feed
+ * that has never delivered contributes nothing, which is why this can be empty.
+ */
+function Attributions({ sources }: { sources: DataSourceSummary[] }) {
+  const credits = new Map<string, { name: string; url: string }>();
+  for (const source of sources) {
+    for (const credit of source.attribution ?? []) {
+      credits.set(`${credit.name}|${credit.url}`, credit);
+    }
+  }
+  if (credits.size === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Data attribution"
+        description="Required by the licences the real feeds are used under."
+      />
+      <ul className="flex flex-wrap gap-x-4 gap-y-1.5 px-5 pb-4 text-[11.5px] text-content-tertiary">
+        {[...credits.values()].map((credit) => (
+          <li key={`${credit.name}|${credit.url}`}>
+            {credit.url ? (
+              <a
+                href={credit.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-line-default underline-offset-2 hover:text-content-secondary"
+              >
+                {credit.name}
+              </a>
+            ) : (
+              // Named without a link. Rendered as text rather than a dead
+              // anchor, which would look like a broken page.
+              credit.name
+            )}
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

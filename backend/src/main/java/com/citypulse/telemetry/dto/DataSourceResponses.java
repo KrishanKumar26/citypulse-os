@@ -40,8 +40,30 @@ public final class DataSourceResponses {
                     + "the window — configured to run and not running")
             boolean silent,
 
-            boolean demoData
+            boolean demoData,
+
+            @Schema(description = "What kind of thing produced this feed's numbers: MEASURED (a "
+                    + "government monitoring station), MODELLED (Copernicus CAMS — the real "
+                    + "atmosphere, solved for rather than measured) or SYNTHETIC (generated "
+                    + "here). Finer than demoData, which only asks whether this platform "
+                    + "invented the row: both real feeds answer that the same way.",
+                    allowableValues = {"MEASURED", "MODELLED", "SYNTHETIC"})
+            String provenance,
+
+            @Schema(description = "Credits this feed's licence requires be displayed wherever "
+                    + "its data appears. Written by the ingester from the provider's own "
+                    + "response, so it names the agencies behind the readings actually held — "
+                    + "WAQI obliges attribution to the originating agency, which differs per "
+                    + "station. Empty for generated feeds, which owe no credit.")
+            List<Attribution> attribution
     ) {
+    }
+
+    /**
+     * One required credit. Mirrors {@link com.citypulse.telemetry.domain.Attribution}
+     * so the API surface does not change shape if the stored form does.
+     */
+    public record Attribution(String name, String url) {
     }
 
     /**

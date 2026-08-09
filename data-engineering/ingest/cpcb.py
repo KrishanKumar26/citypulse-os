@@ -32,16 +32,14 @@ here would silently reintroduce synthetic data behind a source labelled real.
 from __future__ import annotations
 
 import json
-import math
 import os
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -49,9 +47,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import psycopg  # noqa: E402
 from psycopg.rows import dict_row  # noqa: E402
 
-from common.db import execute_batched  # noqa: E402
+from ingest import air_store  # noqa: E402
+from ingest.air_store import haversine_km  # noqa: E402  (re-exported for tests)
 from ingest.cpcb_aqi import compute  # noqa: E402
-from pipeline.measured_air import overlay  # noqa: E402
+from pipeline.air_provenance import MEASURED, overlay  # noqa: E402
 
 # The live CPCB resource on data.gov.in.
 RESOURCE_ID = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
@@ -64,6 +63,9 @@ ENDPOINT = f"https://api.data.gov.in/resource/{RESOURCE_ID}"
 MAX_STATION_KM = 8.0
 
 SOURCE_CODE = "cpcb-air-quality"
+
+# Curated windows this run may repoint — see ingest.waqi.
+OVERLAY_WINDOW = timedelta(hours=6)
 
 
 class NotAuthorised(RuntimeError):
@@ -90,16 +92,6 @@ class Station:
     longitude: float
     measured_at: datetime
     concentrations: dict[str, float]
-
-
-def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Great-circle distance. Straight-line degrees are not distance in India."""
-    radius = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2
-         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
-    return 2 * radius * math.asin(math.sqrt(a))
 
 
 def _fetch_page(api_key: str, limit: int, offset: int, attempts: int,
@@ -272,84 +264,53 @@ def main() -> int:
     stations = parse_stations(records)
     print(f"  {len(stations)} stations reported")
 
+    now = datetime.now(timezone.utc)
+
     with psycopg.connect(dsn, row_factory=dict_row) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT id FROM data_sources WHERE code = %s", (SOURCE_CODE,))
-            row = cursor.fetchone()
-            if row is None:
-                print(f"No data source '{SOURCE_CODE}'. Migration V16 seeds it.")
-                return 1
-            source_id = row["id"]
+        source = air_store.source_id(connection, SOURCE_CODE)
+        if source is None:
+            print(f"No data source '{SOURCE_CODE}'. Migration V16 seeds it.")
+            return 1
 
-            cursor.execute("""
-                SELECT z.id, z.code, z.center_latitude AS lat, z.center_longitude AS lon
-                FROM zones z WHERE z.active AND z.deleted_at IS NULL
-            """)
-            zones = cursor.fetchall()
+        zones = air_store.active_zones(connection)
 
-        rows = []
-        matched = 0
+        readings: list[air_store.Reading] = []
         for station in stations:
             result = compute(station.concentrations)
             if result is None:
                 # CPCB would not publish an index from this either.
                 continue
 
-            nearest = None
-            nearest_km = MAX_STATION_KM
-            for zone in zones:
-                km = haversine_km(station.latitude, station.longitude,
-                                  float(zone["lat"]), float(zone["lon"]))
-                if km < nearest_km:
-                    nearest, nearest_km = zone, km
-
-            if nearest is None:
-                # No monitored zone is near enough for this station to be
-                # measuring it. Dropped rather than attached to whatever
-                # happened to be closest.
+            # No monitored zone near enough means the station is dropped, not
+            # attached to whatever happened to be closest.
+            match = air_store.nearest_zone(zones, station.latitude, station.longitude,
+                                           MAX_STATION_KM)
+            if match is None:
                 continue
 
-            matched += 1
             c = station.concentrations
-            rows.append((
-                str(uuid.uuid4()), nearest["id"], source_id, station.measured_at,
-                result.aqi, result.category,
-                c.get("PM2.5"), c.get("PM10"), c.get("NO2"), c.get("OZONE"), c.get("CO"),
-                # The reason these rows exist: measured, not generated.
-                False,
+            readings.append(air_store.Reading(
+                zone_id=match[0].id,
+                event_time=station.measured_at,
+                aqi=result.aqi,
+                category=result.category,
+                pm25=c.get("PM2.5"), pm10=c.get("PM10"), no2=c.get("NO2"),
+                o3=c.get("OZONE"), co=c.get("CO"),
             ))
 
-        if rows:
-            execute_batched(connection, """
-                INSERT INTO air_quality_events
-                    (event_id, zone_id, source_id, event_time, aqi, category,
-                     pm25, pm10, no2, o3, co, demo_data)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (event_id) DO NOTHING
-            """, rows)
-
-            with connection.cursor() as cursor:
-                # Activated here rather than by a migration. V16 seeds this
-                # source PAUSED and says it "becomes ACTIVE when someone
-                # configures a key" — a delivery is the evidence that one is
-                # configured, and it is evidence this deployment produced. A
-                # migration would mark it ACTIVE everywhere, including forks with
-                # no key, where the Data Health page would then report a silent
-                # feed: a fault report for a deliberate state.
-                cursor.execute(
-                    "UPDATE data_sources SET last_ingested_at = now(), status = 'ACTIVE' "
-                    "WHERE id = %s", (source_id,))
-            connection.commit()
-
+        written = air_store.write(connection, source, readings)
+        overlaid: dict[str, int] = {}
+        if written:
+            air_store.mark_delivered(connection, source)
             # The curated windows covering these readings were built before the
             # readings arrived, from generated air. Written to the raw table and
             # left there, a measurement is something nothing reads: the
             # dashboard reads zone_metrics.
-            overlaid = overlay(connection)
+            overlaid = overlay(connection, since=now - OVERLAY_WINDOW)
 
-    print(f"  {matched} stations within {MAX_STATION_KM} km of a monitored zone")
-    print(f"  {len(rows)} real readings written (demo_data = false)")
-    print(f"  {overlaid if rows else 0} curated windows now report measured air")
+    print(f"  {len(readings)} stations within {MAX_STATION_KM} km of a monitored zone")
+    print(f"  {written} measured readings written (demo_data = false)")
+    print(f"  {overlaid.get(MEASURED, 0)} curated windows now report measured air")
     return 0
 
 

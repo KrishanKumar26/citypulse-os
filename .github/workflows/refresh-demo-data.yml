@@ -105,23 +105,51 @@ jobs:
           python -m pipeline.local_runner --input /tmp/refresh.jsonl \
             --max-lateness-hours $((HOURS + 2)) --quiet
 
-      - name: Ingest real air quality from CPCB
-        # After the generated load and before detection, in that order for a
-        # reason: the load has just rebuilt the windows this covers from
-        # generated air, and the overlay re-points them and recomputes risk.
-        # Detection reads those windows, so running it first would measure the
-        # invented air and then have the real number arrive underneath it.
-        #
-        # Not gated on the key: the module reports what it did and writes
-        # nothing without one, so a fork with no CPCB_API_KEY gets a clear line
-        # in the log rather than a step that looks like it ran.
+      # ---------------------------------------------------------------------
+      # Real air quality, best source first.
+      #
+      # Both steps run after the generated load and before detection, in that
+      # order for a reason: the load has just rebuilt these windows from
+      # generated air, and each ingester re-points the ones it covers and
+      # recomputes risk. Detection reads those windows, so running it first
+      # would measure the invented air and then have the real number arrive
+      # underneath it.
+      #
+      # Stations first, then the model. The overlay ranks MEASURED above
+      # MODELLED whatever order they arrive in, so this is for the log rather
+      # than the result: the second step reports how many windows the first one
+      # had already claimed.
+      #
+      # data.gov.in is deliberately absent. `ingest.cpcb` still works and is
+      # still tested, but that endpoint has answered every request from this
+      # deployment with "Key not authorised", and a step that fails on every
+      # hourly run teaches a reader to ignore a red mark. WAQI republishes the
+      # same CPCB stations. To put it back, add a step running `ingest.cpcb`
+      # with CPCB_API_KEY once data.gov.in issues a key that works.
+      # ---------------------------------------------------------------------
+
+      - name: Ingest measured air quality from monitoring stations
+        # Not gated on the token: the module reports what it did and writes
+        # nothing without one, so a fork with no WAQI_API_TOKEN gets a clear
+        # line in the log rather than a step that looks like it ran.
         if: steps.check.outputs.configured == 'true'
         continue-on-error: true
         working-directory: data-engineering
         env:
           CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
-          CPCB_API_KEY: ${{ secrets.CPCB_API_KEY }}
-        run: python -m ingest.cpcb
+          WAQI_API_TOKEN: ${{ secrets.WAQI_API_TOKEN }}
+        run: python -m ingest.waqi
+
+      - name: Ingest modelled air quality for every other zone
+        # No key at all, so this one runs everywhere including forks. It is what
+        # keeps the other fifty-odd zones off invented air: stations sit at
+        # fixed points and cover a small minority of the map.
+        if: steps.check.outputs.configured == 'true'
+        continue-on-error: true
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: python -m ingest.open_meteo
 
       - name: Issue forecasts and detect anomalies
         if: steps.check.outputs.configured == 'true'
@@ -157,4 +185,17 @@ jobs:
               print(f"newest window: {newest}")
               print(f"windows in the last 8h: {recent}")
               print(f"database size: {size}")
+
+              # The number this workflow exists to move. A run that loaded
+              # windows but left them all SYNTHETIC did not fail — both feeds
+              # are continue-on-error — and this is the only place that shows it.
+              cur.execute("""
+                  SELECT coalesce(aqi_source, 'no AQI'), count(*)
+                    FROM zone_metrics
+                   WHERE window_start > now() - interval '2 hours'
+                   GROUP BY 1 ORDER BY 2 DESC
+              """)
+              print("air provenance, last 2h:")
+              for label, count in cur.fetchall():
+                  print(f"  {label:<10} {count}")
           PY

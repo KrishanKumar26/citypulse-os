@@ -148,6 +148,59 @@ class LiveIntelligenceIT extends IntegrationTest {
                 .isGreaterThan(snapshot.path("kpis").path("zonesReporting").asInt());
     }
 
+    /** Sets one window's air provenance, which {@link #insertWindow} leaves null. */
+    private void setAirProvenance(String zoneCode, Instant windowStart, String provenance) {
+        transactionTemplate.executeWithoutResult(status ->
+                entityManager.createNativeQuery("""
+                UPDATE zone_metrics SET aqi_source = :provenance
+                 WHERE window_start = CAST(:start AS timestamptz)
+                   AND zone_id = (SELECT id FROM zones WHERE code = :code)
+                """)
+                .setParameter("provenance", provenance)
+                .setParameter("start", windowStart.toString())
+                .setParameter("code", zoneCode)
+                .executeUpdate());
+    }
+
+    @Test
+    @DisplayName("each of the three air provenances reaches the client as itself")
+    void airProvenanceSurvivesToTheClient() throws Exception {
+        Tokens tokens = loginAs("live-air-provenance@example.com", RoleName.CITY_OPERATOR);
+        Instant window = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(2, ChronoUnit.MINUTES);
+
+        // Three zones in one city, one per provenance — the shape a real
+        // deployment has, where a zone beside a monitoring station reads an
+        // instrument and its neighbour reads a model.
+        insertWindow("BLR-WHF", window, "0.60", "40.00", "MODERATE", 140, "38.00", "MODERATE", 0, 6);
+        insertWindow("BLR-KOR", window, "0.60", "40.00", "MODERATE", 150, "38.00", "MODERATE", 0, 6);
+        insertWindow("BLR-IND", window, "0.60", "40.00", "MODERATE", 160, "38.00", "MODERATE", 0, 6);
+        setAirProvenance("BLR-WHF", window, "MEASURED");
+        setAirProvenance("BLR-KOR", window, "MODELLED");
+        setAirProvenance("BLR-IND", window, "SYNTHETIC");
+
+        JsonNode snapshot = snapshot(tokens.accessToken());
+
+        assertThat(zone(snapshot, "BLR-WHF").path("aqiSource").asText()).isEqualTo("MEASURED");
+        assertThat(zone(snapshot, "BLR-KOR").path("aqiSource").asText()).isEqualTo("MODELLED");
+        assertThat(zone(snapshot, "BLR-IND").path("aqiSource").asText()).isEqualTo("SYNTHETIC");
+    }
+
+    @Test
+    @DisplayName("a window with an AQI but no recorded provenance does not claim one")
+    void airProvenanceIsNotInventedForAnUnlabelledWindow() throws Exception {
+        Tokens tokens = loginAs("live-air-unlabelled@example.com", RoleName.CITY_OPERATOR);
+        Instant window = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(2, ChronoUnit.MINUTES);
+        insertWindow("BLR-WHF", window, "0.60", "40.00", "MODERATE", 140, "38.00", "MODERATE", 0, 6);
+
+        JsonNode zone = zone(snapshot(tokens.accessToken()), "BLR-WHF");
+
+        // The AQI is still reported — an unlabelled reading is still a reading.
+        // What must not happen is a default: SYNTHETIC would accuse a real
+        // measurement of being invented, and MEASURED would do the reverse.
+        assertThat(zone.path("aqi").asInt()).isEqualTo(140);
+        assertThat(notMeasured(zone, "aqiSource")).isTrue();
+    }
+
     @Test
     @DisplayName("synthetic telemetry stays labelled all the way to the client")
     void demoDataIsLabelled() throws Exception {

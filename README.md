@@ -40,7 +40,7 @@ otherwise.
 | Action Center | Response plans: the step between an alert and an action |
 | Impact | What actually followed a recorded action, against the zone's baseline |
 | City Analytics | Curated series over 1h–30d, with the coverage behind each point |
-| Data Sources | Feed inventory and which ones have gone silent |
+| Data Sources | Feed inventory, provenance, attribution, and which feeds have gone silent |
 | Data Health | What the pipeline received against what it kept |
 | API Management | Scoped API keys, shown once and stored hashed |
 | Settings | Profile and session management |
@@ -51,11 +51,11 @@ otherwise.
 | Suite | Count |
 |---|---|
 | Backend unit (JUnit, surefire) | 87 |
-| Backend integration (JUnit, failsafe, real PostgreSQL) | 157 |
-| Data platform (pytest) | 223 |
+| Backend integration (JUnit, failsafe, real PostgreSQL) | 162 |
+| Data platform (pytest) | 264 |
 | dbt models and tests | 108 |
-| Frontend (Vitest) | 73 |
-| **Total** | **648** |
+| Frontend (Vitest) | 78 |
+| **Total** | **699** |
 
 Plus two end-to-end shell suites under [`docs/verification/`](docs/verification/)
 that drive the running stack over HTTP.
@@ -86,6 +86,36 @@ That sounds like a slogan; in practice it decided a great many things:
   without a real observed baseline — a before/after where the "before" was
   invented is worse than no answer.
 - Synthetic data is labelled as synthetic all the way to the browser.
+
+### Air quality is where that principle got expensive
+
+Traffic, weather, incidents and city events are generated, by design: the
+platform has to run with no external dependency. Air quality is the one signal
+with real public feeds, so it uses them — and having two of them, of two
+different kinds, forced the labelling to get more honest than a boolean.
+
+| Provenance | Source | What it means |
+|---|---|---|
+| `MEASURED` | CPCB stations, via [WAQI](https://waqi.info/) | An instrument reported it, within 8 km of the zone centre |
+| `MODELLED` | Copernicus CAMS, via [Open-Meteo](https://open-meteo.com/) | The real atmosphere, solved for — no instrument stood in this zone |
+| `SYNTHETIC` | this repository | Generated. No real feed covers this zone and hour |
+| `null` | — | The window has no AQI at all, which is not the same as a generated one |
+
+Three rules hold it together:
+
+- **The tiers never mix.** Where a station covers a window its reading replaces
+  the generated one outright. A mean of an instrument and a simulation is
+  neither, and would carry the label of the better half.
+- **One index, one scale.** WAQI publishes on the US-EPA scale, where 192 reads
+  *Unhealthy*; CPCB puts 192 in *MODERATE*. Station sub-indices are inverted back
+  to concentrations and CPCB's index is recomputed from those, on CPCB's own
+  averaging periods — 24 hours for the particulates, 8 for CO and ozone.
+- **Real readings expire.** A station publishes hourly, so its reading covers the
+  windows after it for an hour and then stops. A feed that went quiet three hours
+  ago must stop colouring the present.
+
+Every screen that shows an AQI shows which of the four it is, and Data Sources
+carries the credits WAQI's and Open-Meteo's terms require.
 
 ---
 

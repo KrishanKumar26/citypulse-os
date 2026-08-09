@@ -124,7 +124,14 @@ public class DataSourceService {
                             // delivering nothing is expected; an ACTIVE one
                             // delivering nothing is the thing worth surfacing.
                             active && rows == 0,
-                            source.isDemoData());
+                            source.isDemoData(),
+                            source.getProvenance(),
+                            source.getAttribution() == null
+                                    ? List.of()
+                                    : source.getAttribution().stream()
+                                            .map(a -> new DataSourceResponses.Attribution(
+                                                    a.name(), a.url()))
+                                            .toList());
                 })
                 .toList();
 

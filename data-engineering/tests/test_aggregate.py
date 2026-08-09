@@ -240,26 +240,27 @@ def test_stats_are_optional():
 
 
 class TestAirProvenance:
-    """A measured AQI and a generated one must not become the same number.
+    """A measured AQI, a modelled one and a generated one are three things.
 
-    CPCB stations sit at fixed points and `ingest.cpcb` refuses to attribute one
-    beyond its distance limit, so on any real deployment most zones have no
-    station and keep generated air. These tests pin the two halves of that: the
-    covered zone reports an instrument, the uncovered one reports the generator,
-    and neither is described as the other.
+    Monitoring stations sit at fixed points and the station ingester refuses to
+    attribute one beyond its distance limit, so on any real deployment most
+    zones have no instrument. Copernicus CAMS covers them instead — real
+    atmosphere, solved for rather than measured — and the generator covers what
+    is left. These tests pin all three: each is reported as itself, the better
+    one wins outright where they overlap, and none is ever averaged into another.
     """
 
     def test_generated_air_is_marked_generated(self) -> None:
         rows = run([traffic(0), air(0, aqi=120)])
         assert rows[0]["aqi"] == 120
-        assert rows[0]["aqi_measured"] is False
+        assert rows[0]["aqi_source"] == "SYNTHETIC"
 
     def test_measured_air_is_marked_measured(self) -> None:
         measured = air(0, aqi=200)
         measured["demo_data"] = False
         rows = run([traffic(0), measured])
         assert rows[0]["aqi"] == 200
-        assert rows[0]["aqi_measured"] is True
+        assert rows[0]["aqi_source"] == "MEASURED"
 
     def test_a_measurement_is_never_averaged_with_a_simulation(self) -> None:
         # The mean of 200 and 100 is 150, which no instrument reported and no
@@ -269,14 +270,14 @@ class TestAirProvenance:
         measured["demo_data"] = False
         rows = run([traffic(0), measured, air(1, aqi=100)])
         assert rows[0]["aqi"] == 200
-        assert rows[0]["aqi_measured"] is True
+        assert rows[0]["aqi_source"] == "MEASURED"
 
     def test_several_measurements_are_averaged_with_each_other(self) -> None:
         first, second = air(0, aqi=200), air(1, aqi=210)
         first["demo_data"] = second["demo_data"] = False
         rows = run([traffic(0), first, second])
         assert rows[0]["aqi"] == 205
-        assert rows[0]["aqi_measured"] is True
+        assert rows[0]["aqi_source"] == "MEASURED"
 
     def test_no_air_at_all_is_neither(self) -> None:
         # Null, not False: "nothing was measured here" and "this number was
@@ -284,7 +285,7 @@ class TestAirProvenance:
         # provenance to report.
         rows = run([traffic(0)])
         assert rows[0]["aqi"] is None
-        assert rows[0]["aqi_measured"] is None
+        assert rows[0]["aqi_source"] is None
 
     def test_an_uncovered_zone_keeps_generated_air(self) -> None:
         # The station covers WHF; KOR is out of range and must be unaffected.
@@ -293,9 +294,40 @@ class TestAirProvenance:
         rows = run([traffic(0, zone="BLR-WHF"), measured,
                     traffic(0, zone="BLR-KOR"), air(0, zone="BLR-KOR", aqi=90)])
         by_zone = {r["zone_code"]: r for r in rows}
-        assert by_zone["BLR-WHF"]["aqi_measured"] is True
-        assert by_zone["BLR-KOR"]["aqi_measured"] is False
+        assert by_zone["BLR-WHF"]["aqi_source"] == "MEASURED"
+        assert by_zone["BLR-KOR"]["aqi_source"] == "SYNTHETIC"
         assert by_zone["BLR-KOR"]["aqi"] == 90
+
+    def test_modelled_air_is_marked_modelled(self) -> None:
+        modelled = air(0, aqi=150)
+        modelled["demo_data"] = False
+        modelled["provenance"] = "MODELLED"
+        rows = run([traffic(0), modelled])
+        assert rows[0]["aqi"] == 150
+        assert rows[0]["aqi_source"] == "MODELLED"
+
+    def test_a_model_outranks_the_generator(self) -> None:
+        # CAMS tracks the real atmosphere and the generator tracks nothing, so
+        # where both cover a window the model is the answer — alone, not
+        # averaged. 150 and 90 would mean 120, which neither produced.
+        modelled = air(0, aqi=150)
+        modelled["demo_data"] = False
+        modelled["provenance"] = "MODELLED"
+        rows = run([traffic(0), modelled, air(1, aqi=90)])
+        assert rows[0]["aqi"] == 150
+        assert rows[0]["aqi_source"] == "MODELLED"
+
+    def test_an_instrument_outranks_a_model(self) -> None:
+        # The distinction is kind, not freshness: something stood in this zone
+        # and measured the air, and a solved field does not displace that.
+        measured = air(0, aqi=200)
+        measured["demo_data"] = False
+        modelled = air(1, aqi=150)
+        modelled["demo_data"] = False
+        modelled["provenance"] = "MODELLED"
+        rows = run([traffic(0), modelled, measured])
+        assert rows[0]["aqi"] == 200
+        assert rows[0]["aqi_source"] == "MEASURED"
 
     def test_the_window_stays_demo_while_traffic_is_generated(self) -> None:
         # Real air does not make the window real. Traffic is still invented, and
@@ -304,4 +336,4 @@ class TestAirProvenance:
         measured["demo_data"] = False
         rows = run([traffic(0), measured])
         assert rows[0]["demo_data"] is True
-        assert rows[0]["aqi_measured"] is True
+        assert rows[0]["aqi_source"] == "MEASURED"
