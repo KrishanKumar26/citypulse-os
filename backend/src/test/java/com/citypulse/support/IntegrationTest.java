@@ -9,6 +9,7 @@ import com.citypulse.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import org.springframework.dao.DataAccessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -128,6 +130,9 @@ public abstract class IntegrationTest {
      */
     private static Long seededZoneWatermark;
 
+    /** Deadlocks are resolved by one side dying; three losses in a row is a bug. */
+    private static final int RESET_ATTEMPTS = 3;
+
     /**
      * Clears per-test data while leaving seeded reference data intact.
      *
@@ -141,6 +146,57 @@ public abstract class IntegrationTest {
      * exactly the kind of flake that erodes trust in a suite.
      */
     protected void resetMutableState() {
+        // Retried, and only on a deadlock.
+        //
+        // The reset takes AccessExclusiveLock on a dozen tables in the order it
+        // lists them. It is not alone in the database while it does: the
+        // application under test is fully started, and its own background work
+        // — an open SSE subscription re-reading zone_metrics, a scheduled read
+        // — holds AccessShareLock on some of the same tables in whatever order
+        // its query joins them. Two lock orders over one set of tables is the
+        // textbook shape of a deadlock, and PostgreSQL resolves it by killing
+        // one side. It killed this one, and a green suite went red on a commit
+        // that touched only frontend files.
+        //
+        // Ordering the truncates cannot fix it, because the other side is an
+        // arbitrary SELECT whose order this class does not control. A retry
+        // can: the loser's transaction rolled back whole, so running it again
+        // is not a partial state being patched up.
+        //
+        // Narrow on purpose. Only SQLSTATE 40P01 and 40001 are retried, so a
+        // genuine failure — a constraint violation, a missing table — still
+        // fails on the first attempt rather than three times more slowly.
+        DataAccessException last = null;
+        for (int attempt = 1; attempt <= RESET_ATTEMPTS; attempt++) {
+            try {
+                truncateMutableState();
+                return;
+            } catch (DataAccessException exception) {
+                if (!isSerialisationConflict(exception)) {
+                    throw exception;
+                }
+                last = exception;
+            }
+        }
+        throw new IllegalStateException(
+                "Could not reset test state after " + RESET_ATTEMPTS + " deadlocks", last);
+    }
+
+    /** PostgreSQL: 40P01 deadlock_detected, 40001 serialization_failure. */
+    private static boolean isSerialisationConflict(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql
+                    && ("40P01".equals(sql.getSQLState()) || "40001".equals(sql.getSQLState()))) {
+                return true;
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+        }
+        return false;
+    }
+
+    private void truncateMutableState() {
         transactionTemplate.executeWithoutResult(status -> {
             entityManager.createNativeQuery(
                             "TRUNCATE TABLE audit_logs, refresh_tokens, user_tokens, user_roles, users "

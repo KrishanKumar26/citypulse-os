@@ -412,7 +412,7 @@ function RoadmapSection() {
         </h2>
         <p className="mt-3 max-w-2xl text-[15px] text-content-secondary">
           The application builds, boots and passes its test suite at the end of every phase.
-          Currently 543 automated checks across the backend, data platform, dbt models and
+          Currently 698 automated checks across the backend, data platform, dbt models and
           frontend.
         </p>
 

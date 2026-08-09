@@ -13,12 +13,13 @@ about a minute while the JVM starts; that is the free tier, not a fault. A
 scheduled job reloads telemetry hourly, so the dashboard is never more than an
 hour behind itself.
 
-Built to the product requirements in [`docs/PRD.md`](docs/PRD.md). Phases 0–7 of
-[the plan](docs/DEVELOPMENT_PLAN.md) are complete and verified. Phase 8 (CI,
-containers, deployment) has not been started. Several Phase 9 surfaces have
-shipped — API key management, demo-mode labelling, the analytics and data
-screens — but the phase is not closed: its performance and accessibility exit
-criteria remain unmeasured, so it is still listed as pending.
+Built to the product requirements in [`docs/PRD.md`](docs/PRD.md). Phases 0–8 of
+[the plan](docs/DEVELOPMENT_PLAN.md) are complete and verified: CI runs the
+backend, frontend and data-platform suites on every push, every service has a
+Dockerfile, and the platform is deployed and reachable at the link above. Phase
+9 is in progress rather than pending — API key management, demo-mode labelling
+and the analytics and data screens have shipped, while the phase's performance
+and accessibility exit criteria remain unmeasured.
 
 ---
 
