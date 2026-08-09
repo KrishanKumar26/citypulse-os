@@ -241,10 +241,14 @@ Stated here rather than left to be discovered:
   persistence baselines, production scoring — is genuine and would apply
   unchanged to a real feed. The accuracy figures are not a claim about any real
   city.
-- **The full container stack has never been started all at once.** Kafka, MinIO
-  and Spark have each been run and verified individually; bringing all nine
-  compose services up together needs more disk than the development machine had.
-  Recorded in the plan rather than ticked quietly.
+- **The full container stack has never run on the development machine.** All
+  nine services of the `streaming` profile need more disk than it has. It does
+  run in CI, on every push, where a runner has room: the job waits for
+  PostgreSQL, Kafka, MinIO and the backend to report *healthy* rather than
+  merely started, checks the topics exist, and then waits for curated windows to
+  appear — proving events travelled generator → Kafka → Spark → PostgreSQL. What
+  remains untested is that path on a laptop, which is a statement about the
+  laptop.
 - **There is no browser-level end-to-end coverage.** "The dashboard updates
   without a refresh" is proven at two levels — the server pushes without being
   asked, and the hook consuming those pushes behaves correctly under drop and
