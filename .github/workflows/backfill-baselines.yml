@@ -1,0 +1,194 @@
+# =============================================================================
+# Give every city enough history to be measured against.
+#
+# The hosted database was seeded when the platform had three cities. Migration
+# V15 added seven more, and the hourly refresh keeps them *current* but never
+# gave them a *past* — so `intelligence.jobs detect` declined them, reporting
+# "11,928 declined for thin baselines", and AI Insights and Anomaly Detection
+# were empty for seven cities out of ten while looking merely quiet.
+#
+# A baseline bucket is zone × metric × hour-of-week, and a deviation is only
+# reported once a bucket holds MIN_BASELINE_SAMPLES (12) windows. At twelve
+# five-minute windows per hour, one week of history fills every bucket exactly
+# to that threshold, and ten days clears it comfortably. Four weeks would be
+# better statistics and worse arithmetic: Neon's free tier is 500 MB, the
+# existing data is already ~200 MB of it, and 62 zones × 28 days does not fit.
+#
+# Run once, by hand. The hourly refresh does the rest from then on.
+# =============================================================================
+
+name: Backfill baselines
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days of history to generate for cities that have none"
+        required: false
+        default: "10"
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    name: Backfill history and learn baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: data-engineering/requirements.txt
+
+      - name: Check the deployment is configured
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: |
+          if [ -z "$CITYPULSE_PG_DSN" ]; then
+            echo "HOSTED_PG_DSN is not set; nothing to back-fill." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: data-engineering
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Which cities have no past?
+        id: gaps
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os, psycopg
+          # A city is "thin" when its oldest curated window is younger than a
+          # week — it cannot yet have filled an hour-of-week bucket to the
+          # twelve samples the detector requires.
+          with psycopg.connect(os.environ["CITYPULSE_PG_DSN"]) as c, c.cursor() as cur:
+              cur.execute("""
+                  SELECT c.slug,
+                         COALESCE(EXTRACT(day FROM now() - min(zm.window_start)), 0) AS days
+                    FROM cities c
+                    JOIN zones z ON z.city_id = c.id
+                    LEFT JOIN zone_metrics zm ON zm.zone_id = z.id
+                   WHERE c.deleted_at IS NULL AND c.active
+                   GROUP BY c.slug
+                   ORDER BY c.slug
+              """)
+              rows = cur.fetchall()
+          thin = [slug for slug, days in rows if days < 7]
+          for slug, days in rows:
+              print(f"    {slug:12} {int(days):3d} days of history", flush=True)
+          print(f"thin={','.join(thin)}")
+          PY
+
+      - name: Generate and load, one day at a time
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+          THIN: ${{ steps.gaps.outputs.thin }}
+          DAYS: ${{ inputs.days || '10' }}
+        run: |
+          if [ -z "$THIN" ]; then
+            echo "Every city already has a week of history. Nothing to do."
+            exit 0
+          fi
+          echo "Backfilling $DAYS days for: $THIN"
+
+          for offset in $(seq "$DAYS" -1 1); do
+            FROM=$(date -u -d "$offset days ago" +%Y-%m-%dT00:00:00Z)
+            NEXT=$((offset - 1))
+            if [ "$NEXT" -eq 0 ]; then
+              TO=$(date -u +%Y-%m-%dT00:00:00Z)
+            else
+              TO=$(date -u -d "$NEXT days ago" +%Y-%m-%dT00:00:00Z)
+            fi
+
+            # Fresh file per day: the JSONL sink appends, so reusing the path
+            # would replay every earlier day into this day's load.
+            rm -f /tmp/day.jsonl /tmp/day-thin.jsonl
+
+            python -m generator.main --sink jsonl --out /tmp/day.jsonl --no-realtime \
+                --seed $((4100 + offset)) --tick-seconds 300 \
+                --simulate-from "$FROM" --simulate-to "$TO" --quiet
+
+            # Keep only the cities that need a past. Regenerating a day that a
+            # city already holds would write fresh event ids for events it has
+            # already stored — the raw tables would double for no new
+            # information, on a 500 MB tier.
+            python - <<'PY'
+          import json, os, psycopg
+          thin = tuple(os.environ["THIN"].split(","))
+          # Ask the database which zone codes belong to those cities rather than
+          # deriving them from the slug. The prefixes are airport codes, not
+          # abbreviations: Ahmedabad is AMD, Chennai is MAA, Kolkata is CCU and
+          # Pune is PNQ, so any guess from the slug silently drops four cities.
+          with psycopg.connect(os.environ["CITYPULSE_PG_DSN"]) as c, c.cursor() as cur:
+              cur.execute("""
+                  SELECT z.code FROM zones z JOIN cities c ON c.id = z.city_id
+                   WHERE c.slug = ANY(%s)
+              """, (list(thin),))
+              codes = {row[0] for row in cur.fetchall()}
+          kept = 0
+          with open("/tmp/day.jsonl") as src, open("/tmp/day-thin.jsonl", "w") as dst:
+              for line in src:
+                  e = json.loads(line)
+                  # zone_code is on traffic/air/incident/event rows; weather
+                  # carries city_slug instead.
+                  if e.get("zone_code") in codes or e.get("city_slug") in thin:
+                      dst.write(line); kept += 1
+          print(f"    kept {kept} events", flush=True)
+          PY
+
+            python -m pipeline.local_runner --input /tmp/day-thin.jsonl \
+                --max-lateness-hours $((DAYS * 24 + 48)) --quiet \
+              || { echo "    ${FROM%T*} failed, retrying once"
+                   python -m pipeline.local_runner --input /tmp/day-thin.jsonl \
+                     --max-lateness-hours $((DAYS * 24 + 48)) --quiet \
+                   || echo "    ${FROM%T*} failed again — continuing"; }
+
+            echo "    ${FROM%T*} loaded"
+          done
+
+      - name: Learn baselines, then detect against them
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: |
+          python -m intelligence.jobs baselines
+          python -m intelligence.jobs detect
+          python -m intelligence.jobs memory
+          python -m intelligence.jobs correlations
+
+      - name: Report what each city can now be measured against
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: |
+          python - <<'PY'
+          import os, psycopg
+          with psycopg.connect(os.environ["CITYPULSE_PG_DSN"]) as c, c.cursor() as cur:
+              cur.execute("""
+                  SELECT c.slug,
+                         count(DISTINCT b.id) AS buckets,
+                         count(DISTINCT a.id) FILTER (
+                             WHERE a.window_start > now() - interval '24 hours') AS anomalies
+                    FROM cities c
+                    JOIN zones z ON z.city_id = c.id
+                    LEFT JOIN zone_baselines b ON b.zone_id = z.id
+                    LEFT JOIN anomalies a ON a.zone_id = z.id
+                   WHERE c.deleted_at IS NULL AND c.active
+                   GROUP BY c.slug ORDER BY c.slug
+              """)
+              print(f"{'city':14}{'baselines':>11}{'anomalies 24h':>15}")
+              for slug, buckets, anomalies in cur.fetchall():
+                  print(f"{slug:14}{buckets:>11,}{anomalies:>15,}")
+          PY

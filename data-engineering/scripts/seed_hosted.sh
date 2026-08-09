@@ -71,6 +71,13 @@ for offset in $(seq "$DAYS" -1 1); do
            || date -u -v-"${NEXT}"d +%Y-%m-%dT00:00:00Z)
   fi
 
+  # The JSONL sink opens its file in append mode — it stands in for a Kafka
+  # topic, which is also append-only. Without this the day-at-a-time loop
+  # defeats itself: day N's file still holds days 1..N, so the final load is
+  # the whole four weeks in one transaction, which is precisely the shape the
+  # comment above says died with "SSL SYSCALL error: EOF detected".
+  rm -f "$WORK/day.jsonl"
+
   $PY -m generator.main --sink jsonl --out "$WORK/day.jsonl" --no-realtime \
       --seed $((SEED + offset)) --tick-seconds 300 \
       --simulate-from "$DAY_FROM" --simulate-to "$DAY_TO" --quiet
