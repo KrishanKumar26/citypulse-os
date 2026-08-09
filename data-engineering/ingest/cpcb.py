@@ -35,6 +35,8 @@ import json
 import math
 import os
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -96,13 +98,37 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * radius * math.asin(math.sqrt(a))
 
 
-def fetch(api_key: str, limit: int = 2000) -> list[dict]:
+def fetch(api_key: str, limit: int = 2000, *, attempts: int = 3,
+          timeout: float = 90.0) -> list[dict]:
+    """Read the national feed, retrying a slow or dropped connection.
+
+    data.gov.in answers this resource in a second or two most of the time and
+    occasionally not at all: the first scheduled run died on
+    `TimeoutError: The read operation timed out` at 30 seconds, having asked for
+    every station in the country in one request.
+
+    Retried rather than merely given longer, because the failure is a dropped or
+    stalled connection, not a slow one — a longer single wait would have failed
+    identically, an hour later. Backs off between attempts so a struggling
+    upstream is not asked three times in three seconds.
+    """
     query = urllib.parse.urlencode({"api-key": api_key, "format": "json", "limit": limit})
     request = urllib.request.Request(f"{ENDPOINT}?{query}",
                                      headers={"Accept": "application/json"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        payload = json.load(response)
-    return payload.get("records", [])
+
+    last: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                payload = json.load(response)
+            return payload.get("records", [])
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            last = exc
+            if attempt < attempts:
+                print(f"  attempt {attempt} failed ({exc}); retrying", flush=True)
+                time.sleep(5 * attempt)
+
+    raise RuntimeError(f"CPCB feed unreachable after {attempts} attempts: {last}")
 
 
 def parse_stations(records: list[dict]) -> list[Station]:
