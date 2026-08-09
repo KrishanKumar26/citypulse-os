@@ -60,7 +60,7 @@ function SiteHeader() {
           </Link>
           <Link
             href="/signup"
-            className="rounded-md bg-accent px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
+            className="rounded-md bg-accent px-3.5 py-1.5 text-[13px] font-medium text-surface-base transition-colors hover:bg-accent-hover"
           >
             Create account
           </Link>
@@ -107,7 +107,7 @@ function Hero() {
         <div className="mt-9 flex flex-wrap items-center gap-3">
           <Link
             href="/command-center"
-            className="inline-flex h-11 items-center rounded-md bg-accent px-6 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+            className="inline-flex h-11 items-center rounded-md bg-accent px-6 text-sm font-medium text-surface-base transition-colors hover:bg-accent-hover"
           >
             Open Command Centre
           </Link>
@@ -484,7 +484,7 @@ function CallToAction() {
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link
             href="/command-center"
-            className="inline-flex h-11 items-center rounded-md bg-accent px-6 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+            className="inline-flex h-11 items-center rounded-md bg-accent px-6 text-sm font-medium text-surface-base transition-colors hover:bg-accent-hover"
           >
             Open Command Centre
           </Link>

@@ -18,7 +18,12 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-white hover:bg-accent-hover disabled:bg-accent/40",
+  // Dark ink on the accent, not white. White on #22d3ee measures 1.81:1
+  // against the 4.5:1 an accessibility requirement in PRD §32 asks for —
+  // the label on the product's most-clicked control was the least legible
+  // text in it. The base surface reads 10.88:1 on the same fill, and 12.43:1
+  // on the hover step, so the state change stays visible too.
+  primary: "bg-accent text-surface-base hover:bg-accent-hover disabled:bg-accent/40",
   secondary:
     "bg-surface-overlay text-content-primary border border-line-default hover:bg-surface-hover hover:border-line-strong",
   ghost: "text-content-secondary hover:text-content-primary hover:bg-surface-hover",
