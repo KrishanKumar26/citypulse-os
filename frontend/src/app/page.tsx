@@ -252,7 +252,13 @@ function Capabilities() {
     { title: "What-If Simulator", body: "Weather, events, closures and volume changes run against real observed conditions, with the engine's assumptions documented and unit tested.", state: "Live" },
     { title: "Anomaly Detection", body: "Departures from what each zone normally does at this hour of the week — a learned baseline, not a fixed threshold.", state: "Live" },
     { title: "City Memory", body: "Past situations and what actually followed them. When too few comparable situations exist, it says so rather than guessing.", state: "Live" },
-    { title: "API Platform", body: "Documented REST API with key authentication and rate limiting for third-party access.", state: "Planned" },
+    // Live, and the sentence is narrower than it was. The card claimed
+    // "rate limiting for third-party access" and marked the whole thing
+    // Planned, which was wrong in both directions: keys and the OpenAPI
+    // document have shipped, and the rate limiter covers /api/v1/auth only —
+    // it slows credential stuffing, not a key holder's traffic. Saying so is
+    // cheaper than a reader discovering it against production.
+    { title: "API Platform", body: "Documented OpenAPI surface and scoped API keys, authenticated on their own header and frozen to the permissions held when issued. Per-key rate limiting is not built; the limiter that exists guards the authentication endpoints.", state: "Live" },
   ];
 
   return (
@@ -386,8 +392,15 @@ function RoadmapSection() {
     { phase: "Phase 5", title: "Forecast engine", status: "Complete" },
     { phase: "Phase 6", title: "What-if simulator", status: "Complete" },
     { phase: "Phase 7", title: "Anomalies, city memory & correlation", status: "Complete" },
-    { phase: "Phase 8", title: "CI/CD, container builds & hardening", status: "Next" },
-    { phase: "Phase 9", title: "Cloud deployment, API platform & polish", status: "Planned" },
+    // Both moved on the evidence rather than on the plan. Phase 8: ci.yml runs
+    // the backend, frontend and data-platform suites plus security checks and
+    // a compose smoke, and there are Dockerfiles for every service. Phase 9:
+    // the platform is deployed and reachable, and the API surface is issuing
+    // scoped keys — what is outstanding is the phase's performance and
+    // accessibility criteria, which are unmeasured, so it is in progress
+    // rather than complete.
+    { phase: "Phase 8", title: "CI/CD, container builds & hardening", status: "Complete" },
+    { phase: "Phase 9", title: "Cloud deployment, API platform & polish", status: "In progress" },
   ];
 
   return (
@@ -421,6 +434,7 @@ function StatusPill({ status }: { status: string }) {
   const styles: Record<string, string> = {
     Complete: "border-status-normal/25 bg-status-normal-bg text-status-normal",
     Next: "border-accent/25 bg-accent-subtle text-accent",
+    "In progress": "border-accent/25 bg-accent-subtle text-accent",
     Planned: "border-line-default bg-surface-overlay text-content-tertiary",
   };
   return (
