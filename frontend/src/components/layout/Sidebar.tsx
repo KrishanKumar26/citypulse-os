@@ -21,10 +21,14 @@ import { useSession } from "@/lib/auth/session";
  * does are the same failure, and the second is the one that survived to the
  * first deployment.
  *
- * `permission` applies the same rule to the signed-in account. A VIEWER holds
+ * `permission` applies the same rule to the signed-in account. VIEWER once held
  * five permissions and saw every module as a live link, most of which could only
  * answer "You do not have permission" — navigation that leads nowhere is
  * indistinguishable, to the person clicking it, from a product that is broken.
+ *
+ * VIEWER now reads every module (migration V17), so on this deployment the locks
+ * below stay dark. They are kept because the rule, not the current grant, is what
+ * matters: a deployment that narrows a role should grey the rail, not break it.
  *
  * Locked items stay visible rather than disappearing, so someone can discover a
  * capability exists in order to ask for access. The lock says the feature is

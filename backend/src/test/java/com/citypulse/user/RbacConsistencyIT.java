@@ -90,6 +90,24 @@ class RbacConsistencyIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("VIEWER can read every module the interface offers")
+    void viewerCanOpenEveryModule() {
+        var viewer = roleRepository.findByNameAndDeletedAtIsNull(RoleName.VIEWER).orElseThrow();
+        Set<String> held = viewer.getPermissions().stream()
+                .map(Permission::getName).collect(Collectors.toSet());
+
+        // One entry per permission the sidebar gates a module on. A module that
+        // is built, holds synthetic data, and refuses a signed-in visitor is
+        // indistinguishable from one that is broken — so if a later change
+        // narrows VIEWER, it should fail here rather than in someone's browser.
+        assertThat(held)
+                .as("every module-gating permission must be readable by the signup role")
+                .contains(Permissions.TELEMETRY_READ, Permissions.FORECAST_READ,
+                        Permissions.ALERT_READ, Permissions.ANALYTICS_READ,
+                        Permissions.ANOMALY_READ, Permissions.SIMULATION_READ);
+    }
+
+    @Test
     @DisplayName("only SUPER_ADMIN can manage platform configuration")
     void systemManageIsRestricted() {
         var holders = roleRepository.findByDeletedAtIsNullOrderByNameAsc().stream()
