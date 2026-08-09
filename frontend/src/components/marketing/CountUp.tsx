@@ -25,7 +25,17 @@ const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
 export function CountUp({ to, className }: { to: number; className?: string }) {
   const ref = useRef<HTMLSpanElement | null>(null);
-  const [value, setValue] = useState(0);
+
+  // Starts at the answer, not at zero.
+  //
+  // Counting up from a zero initial state renders "0" into the server's HTML,
+  // so the page ships a sentence reading "0 signal types correlated" — false,
+  // and the one thing this product is not allowed to do. It is also what a
+  // visitor with JavaScript disabled would be left holding.
+  //
+  // So the figure is correct from the first byte, and the effect below rewinds
+  // it only when it is safe to: off-screen, where nobody watches it drop.
+  const [value, setValue] = useState(to);
 
   useEffect(() => {
     const node = ref.current;
@@ -35,13 +45,13 @@ export function CountUp({ to, className }: { to: number; className?: string }) {
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-    // Scheduled rather than set here, for the same reason as Reveal: the
-    // server can answer neither question, so the value cannot be seeded during
-    // render without disagreeing with the markup it hydrates.
-    if (still || typeof IntersectionObserver === "undefined") {
-      const settled = requestAnimationFrame(() => setValue(to));
-      return () => cancelAnimationFrame(settled);
-    }
+    if (still || typeof IntersectionObserver === "undefined") return;
+
+    // Already on screen at mount — near the top of the page, or on a short
+    // viewport. Rewinding here would show the reader the number falling to
+    // zero and climbing back, which is worse than not animating at all.
+    const box = node.getBoundingClientRect();
+    if (box.top < window.innerHeight && box.bottom > 0) return;
 
     let frame = 0;
     let start: number | null = null;
@@ -65,9 +75,15 @@ export function CountUp({ to, className }: { to: number; className?: string }) {
       { threshold: 0.4 },
     );
 
-    observer.observe(node);
+    // Rewound off-screen, then armed. Both in a frame callback rather than in
+    // the effect body: a synchronous write here is a cascading render.
+    const rewind = requestAnimationFrame(() => {
+      setValue(0);
+      observer.observe(node);
+    });
     return () => {
       observer.disconnect();
+      cancelAnimationFrame(rewind);
       cancelAnimationFrame(frame);
     };
   }, [to]);

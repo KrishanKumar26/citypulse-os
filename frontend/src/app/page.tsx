@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { API_BASE_URL } from "@/lib/api/client";
+
 import { CountUp } from "@/components/marketing/CountUp";
 import { Reveal } from "@/components/marketing/Reveal";
 import { PipelineDiagram } from "@/components/marketing/PipelineDiagram";
@@ -131,7 +133,11 @@ function Hero() {
       <div className="mx-auto max-w-6xl px-6 pb-20">
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line-subtle bg-line-subtle md:grid-cols-4">
           {[
-            { count: 6, label: "Signal types correlated" },
+            // Five, not six. ck_data_sources_type admits exactly TRAFFIC,
+            // WEATHER, AIR_QUALITY, INCIDENT and CITY_EVENT — and the hero
+            // diagram three hundred pixels above this row draws those five.
+            // The page was contradicting itself within one screen.
+            { count: 5, label: "Signal types correlated" },
             { count: 5, label: "Forecast horizons" },
             { count: 7, label: "Access roles" },
             { value: "API-first", label: "Every capability exposed" },
@@ -462,7 +468,7 @@ function CallToAction() {
             Create an account
           </Link>
           <a
-            href="http://localhost:8080/swagger-ui.html"
+            href={`${API_BASE_URL}/swagger-ui.html`}
             target="_blank"
             rel="noreferrer"
             className="inline-flex h-11 items-center rounded-md border border-line-default bg-surface-overlay px-6 text-sm font-medium transition-colors hover:border-line-strong hover:bg-surface-hover"
