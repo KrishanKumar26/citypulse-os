@@ -199,6 +199,78 @@
       animation: none;
     }
   }
+
+  /*
+   * Marketing motion.
+   *
+   * Three animations, each carrying a fact rather than decorating one. PRD §32
+   * rules out *unnecessary* animation, which is the test these have to pass:
+   * a signal travelling a path is the pipeline, a dot pulsing at a rate is a
+   * severity, and a section arriving as it is scrolled to is the reading order.
+   * Nothing here loops purely to be seen moving.
+   *
+   * All three collapse to a finished state under prefers-reduced-motion — the
+   * end of the animation, not the start, so a reader who has asked for stillness
+   * gets the diagram rather than an empty one.
+   */
+
+  /* A packet moving along one edge of the pipeline diagram. Each element sets
+     its own offset-path and delay inline; only the timing lives here. */
+  .signal-dot {
+    offset-distance: 0%;
+    animation: signal-travel 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+
+  @keyframes signal-travel {
+    0%   { offset-distance: 0%;   opacity: 0; }
+    12%  { opacity: 1; }
+    88%  { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+
+  /* A zone reporting. The period is set per element from its risk, so a reader
+     can see severity in the rhythm before reading the colour. */
+  .zone-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: zone-pulse var(--pulse-period, 3s) ease-in-out infinite;
+  }
+
+  @keyframes zone-pulse {
+    0%, 100% { transform: scale(1);    opacity: 0.9; }
+    50%      { transform: scale(1.35); opacity: 0.45; }
+  }
+
+  /* A section arriving. Applied by Reveal once the element has been scrolled
+     into view, so the page is not a wall that appears all at once. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 620ms cubic-bezier(0.16, 1, 0.3, 1),
+                transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .reveal[data-shown="true"] {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .signal-dot {
+      animation: none;
+      offset-distance: 62%;
+    }
+
+    .zone-pulse {
+      animation: none;
+    }
+
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
 }
 
 /*

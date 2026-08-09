@@ -1,5 +1,10 @@
 import Link from "next/link";
 
+import { CountUp } from "@/components/marketing/CountUp";
+import { Reveal } from "@/components/marketing/Reveal";
+import { PipelineDiagram } from "@/components/marketing/PipelineDiagram";
+import { SignalFlow } from "@/components/marketing/SignalFlow";
+
 /**
  * Landing page (PRD §6.1).
  *
@@ -73,13 +78,17 @@ function Logo() {
 function Hero() {
   return (
     <section className="border-b border-line-subtle">
-      <div className="mx-auto max-w-6xl px-6 py-20 md:py-28">
+      {/* Copy and diagram side by side from lg. Below that the diagram follows
+          the buttons rather than splitting the sentence from its call to
+          action — it restates the paragraph, so it can wait. */}
+      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-20 md:py-28 lg:grid-cols-[1.15fr_minmax(0,27rem)] lg:items-center lg:gap-16">
+        <div>
         <div className="inline-flex items-center gap-2 rounded-full border border-line-default bg-surface-raised px-3 py-1 text-[12px] text-content-secondary">
           <span className="h-1.5 w-1.5 rounded-full bg-status-normal pulse-dot" aria-hidden="true" />
           Urban Intelligence Platform
         </div>
 
-        <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-[1.1] tracking-tight md:text-[3.25rem]">
+        <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-[1.1] tracking-tight md:text-[3.25rem] lg:text-[2.75rem] xl:text-[3.1rem]">
           Do not build a dashboard that shows data.
           <span className="block text-content-tertiary">
             Build an intelligence layer that understands it.
@@ -112,15 +121,25 @@ function Hero() {
           synthetic and labelled as demo data throughout the product.
         </p>
 
-        <div className="mt-14 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line-subtle bg-line-subtle md:grid-cols-4">
+        </div>
+
+        <Reveal className="lg:pl-4">
+          <SignalFlow />
+        </Reveal>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-6 pb-20">
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line-subtle bg-line-subtle md:grid-cols-4">
           {[
-            { value: "6", label: "Signal types correlated" },
-            { value: "5", label: "Forecast horizons" },
-            { value: "7", label: "Access roles" },
+            { count: 6, label: "Signal types correlated" },
+            { count: 5, label: "Forecast horizons" },
+            { count: 7, label: "Access roles" },
             { value: "API-first", label: "Every capability exposed" },
           ].map((stat) => (
             <div key={stat.label} className="bg-surface-raised px-5 py-6">
-              <div className="text-2xl font-semibold tabular tracking-tight">{stat.value}</div>
+              <div className="text-2xl font-semibold tabular tracking-tight">
+                {stat.count !== undefined ? <CountUp to={stat.count} /> : stat.value}
+              </div>
               <div className="mt-1 text-[13px] text-content-tertiary">{stat.label}</div>
             </div>
           ))}
@@ -180,8 +199,9 @@ function ProblemSection() {
               </div>
             </div>
             <p className="mt-4 text-[13px] text-content-tertiary">
-              Illustrative figures showing the shape of a correlation result. The correlation
-              engine is delivered in Phase 7.
+              Illustrative figures showing the shape of a correlation result. The
+              correlation engine is live — measured correlations, with
+              impliesCausation false in every payload.
             </p>
           </div>
         </div>
@@ -293,7 +313,13 @@ function ArchitectureSection() {
           component exists purely to lengthen a stack diagram.
         </p>
 
-        <div className="mt-10 overflow-hidden rounded-lg border border-line-subtle">
+        <Reveal className="mt-10 overflow-x-auto rounded-lg border border-line-subtle bg-surface-raised p-6">
+          <div className="min-w-[46rem]">
+            <PipelineDiagram />
+          </div>
+        </Reveal>
+
+        <div className="mt-4 overflow-hidden rounded-lg border border-line-subtle">
           {layers.map((layer, index) => (
             <div
               key={layer.name}
