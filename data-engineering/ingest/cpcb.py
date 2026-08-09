@@ -65,6 +65,10 @@ MAX_STATION_KM = 8.0
 
 SOURCE_CODE = "cpcb-air-quality"
 
+
+class NotAuthorised(RuntimeError):
+    """data.gov.in rejected the key. A configuration answer, not an outage."""
+
 # data.gov.in names pollutants in its own way; map to the CPCB table's keys.
 POLLUTANT_ALIASES = {
     "PM2.5": "PM2.5",
@@ -113,6 +117,22 @@ def _fetch_page(api_key: str, limit: int, offset: int, attempts: int,
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 payload = json.load(response)
             return payload.get("records", [])
+        except urllib.error.HTTPError as exc:
+            # 401 and 403 are answers, not failures to get one. Retrying a
+            # rejected key three times with a widening gap turns a one-line
+            # configuration problem into a four-minute step that ends in a
+            # stack trace, and it is wrong every time it is tried.
+            if exc.code in (401, 403):
+                raise NotAuthorised(
+                    f"data.gov.in rejected the key (HTTP {exc.code}). Check "
+                    f"CPCB_API_KEY is the key from your data.gov.in profile and "
+                    f"was stored whole."
+                ) from exc
+            last = exc
+            if attempt < attempts:
+                print(f"    offset {offset}: attempt {attempt} failed ({exc}); retrying",
+                      flush=True)
+                time.sleep(5 * attempt)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             last = exc
             if attempt < attempts:
@@ -240,7 +260,16 @@ def main() -> int:
         print("CITYPULSE_PG_DSN is required.")
         return 1
 
-    stations = parse_stations(fetch(api_key))
+    try:
+        records = fetch(api_key)
+    except NotAuthorised as exc:
+        # One line, no traceback. A stack trace here describes urllib, and the
+        # thing that needs changing is a secret in a settings page.
+        print(f"  {exc}")
+        print("  Nothing was fetched and nothing was written.")
+        return 1
+
+    stations = parse_stations(records)
     print(f"  {len(stations)} stations reported")
 
     with psycopg.connect(dsn, row_factory=dict_row) as connection:
