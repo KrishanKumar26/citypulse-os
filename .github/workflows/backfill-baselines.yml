@@ -67,7 +67,7 @@ jobs:
         env:
           CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
         run: |
-          python - <<'PY' >> "$GITHUB_OUTPUT"
+          python - <<'PY'
           import os, psycopg
           # A city is "thin" when its oldest curated window is younger than a
           # week — it cannot yet have filled an hour-of-week bucket to the
@@ -87,7 +87,12 @@ jobs:
           thin = [slug for slug, days in rows if days < 7]
           for slug, days in rows:
               print(f"    {slug:12} {int(days):3d} days of history", flush=True)
-          print(f"thin={','.join(thin)}")
+          # Only the machine-readable line goes to GITHUB_OUTPUT. Sending the
+          # whole of stdout there fails the step: the table above is not
+          # `key=value`, and the runner rejects the file rather than ignoring
+          # the lines it cannot parse.
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"thin={','.join(thin)}\n")
           PY
 
       - name: Generate and load, one day at a time
