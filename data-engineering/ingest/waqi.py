@@ -15,9 +15,11 @@ came from an instrument rather than from this repository's imagination.
 
 Four things it refuses to do:
 
-**It does not place a station in a zone it is not near.** Stations are at fixed
-coordinates; zones are areas with a centre. A station beyond MAX_STATION_KM is
-not used at all.
+**It does not place a station in a zone it is not near.** Each zone is asked
+which station covers it, and WAQI answers with the nearest one at *any*
+distance — for a zone with no monitoring nearby that is a station in another
+city. The station's own coordinates are checked against MAX_STATION_KM before
+anything is attributed, and beyond it the zone keeps whatever else covers it.
 
 **It does not put a US index in a CPCB-scaled column.** WAQI reports on the
 US-EPA 2016 scale, where 192 is *Unhealthy*; CPCB puts 192 in *MODERATE*. The
@@ -52,7 +54,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -74,12 +75,6 @@ SOURCE_CODE = "waqi-air-quality"
 # defensible; fifteen is not.
 MAX_STATION_KM = 8.0
 
-# Padding on the box drawn around the zones, in degrees — comfortably more than
-# MAX_STATION_KM at Indian latitudes, so no station that could match is outside
-# the box. The box is derived from the zones rather than hardcoded to India, so
-# adding a city elsewhere needs no change here.
-BBOX_PADDING_DEG = 0.15
-
 # A reading older than this is not describing the present. Stations publish
 # hourly and a few run late, so three hours accommodates the stragglers while
 # still refusing a station that stopped reporting last week.
@@ -97,14 +92,6 @@ PROJECT_ATTRIBUTION = {"name": "World Air Quality Index Project", "url": "https:
 
 class NotAuthorised(RuntimeError):
     """WAQI rejected the token. A configuration answer, not an outage."""
-
-
-@dataclass(frozen=True)
-class Station:
-    uid: int
-    name: str
-    latitude: float
-    longitude: float
 
 
 def _get(path: str, params: dict, token: str, *, attempts: int = 3,
@@ -140,8 +127,10 @@ def _get(path: str, params: dict, token: str, *, attempts: int = 3,
             # the retries turn a one-line configuration problem into a stack
             # trace a minute later.
             raise NotAuthorised(
-                f"WAQI rejected the token ({detail}). Check WAQI_API_TOKEN is the "
-                f"token mailed by aqicn.org and was stored whole."
+                f"WAQI rejected the token ({detail}). Two things make this happen: "
+                f"the token was stored short of a character, or it was never "
+                f"activated — aqicn.org mails a confirmation link and the token "
+                f"does not work until it is clicked."
             )
         last = RuntimeError(f"WAQI returned status={status!r} data={detail!r}")
         if attempt < attempts:
@@ -150,38 +139,49 @@ def _get(path: str, params: dict, token: str, *, attempts: int = 3,
     raise RuntimeError(f"WAQI unreachable at {path} after {attempts} attempts: {last}")
 
 
-def bounding_box(zones: list[air_store.Zone],
-                 padding: float = BBOX_PADDING_DEG) -> tuple[float, float, float, float]:
-    """The box that contains every zone, padded past the attribution radius."""
-    lats = [z.latitude for z in zones]
-    lons = [z.longitude for z in zones]
-    return (min(lats) - padding, min(lons) - padding,
-            max(lats) + padding, max(lons) + padding)
+def nearest_station(zone: air_store.Zone, token: str) -> tuple[dict, float] | None:
+    """The station WAQI considers nearest to this zone, and how far away it is.
 
+    One request per zone against `/feed/geo:`, rather than one request for a box
+    around every city followed by a detail call per station inside it. Three
+    reasons, in order of weight:
 
-def stations_in(box: tuple[float, float, float, float], token: str) -> list[Station]:
-    """Every station WAQI knows inside the box.
+    **It is the endpoint every token can reach.** `/map/bounds/` is a separate
+    grant on some tokens, so a working token could still be told "Invalid key"
+    there — a rejection indistinguishable from a bad token, on the one call that
+    decides whether this feed runs at all.
 
-    One request for all of them. The per-station detail — pollutants, the
-    moment, the credits — needs a call each, so this is used to decide which
-    stations are worth asking about rather than to read their values.
+    **It answers the question actually being asked.** The bounds form returns
+    stations and leaves this module to decide which zone each belongs to, which
+    is a nearest-neighbour search reimplemented against WAQI's own. The geo form
+    is asked per zone and returns the station for it.
+
+    **A zone gets one station or none.** That is what the curated layer wants:
+    the overlay averages readings at a moment, and two stations of differing
+    quality inside one radius would average into a number neither reported.
+
+    Distance is still checked here rather than trusted. `/feed/geo:` returns the
+    *nearest* station at any distance — for a zone with no monitoring for two
+    hundred kilometres it returns one two hundred kilometres away, and reporting
+    that as the zone's air is exactly the failure MAX_STATION_KM exists to stop.
     """
-    lat1, lon1, lat2, lon2 = box
-    data = _get("/map/bounds/", {"latlng": f"{lat1},{lon1},{lat2},{lon2}"}, token)
-    if not isinstance(data, list):
-        return []
+    detail = _get(f"/feed/geo:{zone.latitude:.4f};{zone.longitude:.4f}/", {}, token)
+    if not isinstance(detail, dict):
+        return None
 
-    stations = []
-    for entry in data:
-        try:
-            uid = int(entry["uid"])
-            lat = float(entry["lat"])
-            lon = float(entry["lon"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        name = str((entry.get("station") or {}).get("name") or f"station {uid}")
-        stations.append(Station(uid=uid, name=name, latitude=lat, longitude=lon))
-    return stations
+    geo = (detail.get("city") or {}).get("geo")
+    if not isinstance(geo, list) or len(geo) < 2:
+        # Without the station's own coordinates its distance is unknown, and an
+        # unknown distance cannot be checked against the limit.
+        return None
+
+    try:
+        km = air_store.haversine_km(zone.latitude, zone.longitude,
+                                    float(geo[0]), float(geo[1]))
+    except (TypeError, ValueError):
+        return None
+
+    return None if km > MAX_STATION_KM else (detail, km)
 
 
 def _parse_moment(time_block: dict | None) -> datetime | None:
@@ -233,47 +233,38 @@ def main() -> int:
             print("No active zones to attribute stations to.")
             return 1
 
-        try:
-            found = stations_in(bounding_box(zones), token)
-        except NotAuthorised as exc:
-            # One line, no traceback. A stack trace here describes urllib, and
-            # the thing that needs changing is a secret in a settings page.
-            print(f"  {exc}")
-            print("  Nothing was fetched and nothing was written.")
-            return 1
-
-        print(f"  {len(found)} stations in range of the monitored cities")
-
-        # Only stations that land in a zone are worth a detail request.
-        candidates: list[tuple[Station, air_store.Zone, float]] = []
-        for station in found:
-            match = air_store.nearest_zone(zones, station.latitude, station.longitude,
-                                           MAX_STATION_KM)
-            if match is not None:
-                candidates.append((station, match[0], match[1]))
-
-        print(f"  {len(candidates)} within {MAX_STATION_KM:.0f} km of a monitored zone")
-
         now = datetime.now(timezone.utc)
         readings: list[air_store.Reading] = []
         credits: dict[tuple[str, str], dict] = {
             (PROJECT_ATTRIBUTION["name"], PROJECT_ATTRIBUTION["url"]): PROJECT_ATTRIBUTION,
         }
-        no_index = stale = 0
+        covered = no_index = stale = unreachable = 0
 
-        for station, zone, km in candidates:
+        for zone in zones:
             try:
-                detail = _get(f"/feed/@{station.uid}/", {}, token)
+                match = nearest_station(zone, token)
             except NotAuthorised as exc:
+                # One line, no traceback, and the run stops: every remaining
+                # zone would be rejected the same way. A stack trace here
+                # describes urllib, and the thing that needs changing is a
+                # secret in a settings page.
                 print(f"  {exc}")
+                print("  Nothing was fetched and nothing was written.")
                 return 1
             except RuntimeError as exc:
-                # One unreachable station is not a reason to lose the others.
-                print(f"    {station.name}: {exc}")
+                # One unreachable zone is not a reason to lose the others.
+                unreachable += 1
+                print(f"    {zone.code}: {exc}")
                 continue
 
-            if not isinstance(detail, dict):
+            if match is None:
+                # No station within MAX_STATION_KM. The zone keeps whatever
+                # covers it — CAMS, or the generator — and is not attributed a
+                # station that is measuring somewhere else.
                 continue
+
+            detail, km = match
+            covered += 1
 
             moment = _parse_moment(detail.get("time"))
             if moment is None or now - moment > MAX_READING_AGE:
@@ -298,6 +289,11 @@ def main() -> int:
                 url = str(credit.get("url") or "").strip()
                 if name:
                     credits[(name, url)] = {"name": name, "url": url}
+
+        print(f"  {len(zones)} zones asked about")
+        print(f"  {covered} have a station within {MAX_STATION_KM:.0f} km")
+        if unreachable:
+            print(f"  {unreachable} could not be asked")
 
         if stale:
             print(f"  {stale} skipped: last reported more than "

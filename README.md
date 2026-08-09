@@ -52,10 +52,10 @@ otherwise.
 |---|---|
 | Backend unit (JUnit, surefire) | 87 |
 | Backend integration (JUnit, failsafe, real PostgreSQL) | 162 |
-| Data platform (pytest) | 264 |
+| Data platform (pytest) | 263 |
 | dbt models and tests | 108 |
 | Frontend (Vitest) | 78 |
-| **Total** | **699** |
+| **Total** | **698** |
 
 Plus two end-to-end shell suites under [`docs/verification/`](docs/verification/)
 that drive the running stack over HTTP.

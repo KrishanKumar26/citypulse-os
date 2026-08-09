@@ -24,29 +24,48 @@ ZONES = [
 ]
 
 
-class TestTheBoundingBox:
-    def test_it_contains_every_zone(self) -> None:
-        lat1, lon1, lat2, lon2 = waqi.bounding_box(ZONES)
-        for zone in ZONES:
-            assert lat1 < zone.latitude < lat2
-            assert lon1 < zone.longitude < lon2
+class TestFindingAZonesStation:
+    def _answer(self, monkeypatch, payload):
+        monkeypatch.setattr(waqi, "_get", lambda *a, **k: payload)
 
-    def test_the_padding_exceeds_the_attribution_radius(self) -> None:
-        # A station just outside the zones' extent can still be within 8 km of
-        # one of them. Padding smaller than that radius would leave stations
-        # unasked-about, and they would be missing rather than reported absent.
-        lat1, _, lat2, _ = waqi.bounding_box(ZONES)
-        south = min(z.latitude for z in ZONES)
-        # One degree of latitude is about 111 km everywhere.
-        assert (south - lat1) * 111 > waqi.MAX_STATION_KM
+    def test_a_station_in_the_zone_is_accepted_with_its_distance(self, monkeypatch) -> None:
+        # Anand Vihar against Connaught Place: about 12 km apart in reality, so
+        # this uses coordinates a kilometre away to sit inside the limit.
+        self._answer(monkeypatch, {"city": {"geo": [28.6400, 77.2250]}, "iaqi": {}})
+        match = waqi.nearest_station(ZONES[0], "token")
+        assert match is not None
+        assert match[1] < waqi.MAX_STATION_KM
+
+    def test_a_distant_station_is_refused(self, monkeypatch) -> None:
+        # /feed/geo: returns the nearest station at *any* distance. For a zone
+        # with no monitoring nearby that is a station in another city, and
+        # publishing it as this zone's air is the failure the limit exists for.
+        self._answer(monkeypatch, {"city": {"geo": [19.0662, 72.8697]}, "iaqi": {}})
+        assert waqi.nearest_station(ZONES[0], "token") is None  # Mumbai vs Delhi
+
+    def test_a_station_with_no_coordinates_is_refused(self, monkeypatch) -> None:
+        # An unknown distance cannot be checked against the limit, and accepting
+        # it would let exactly the case above through unexamined.
+        for payload in ({"city": {}}, {"city": {"geo": []}}, {"city": {"geo": ["x", "y"]}}, {}):
+            self._answer(monkeypatch, payload)
+            assert waqi.nearest_station(ZONES[0], "token") is None
+
+    def test_the_limit_is_the_boundary_it_claims(self, monkeypatch) -> None:
+        # 8 km due north of Connaught Place: one degree of latitude is ~111 km.
+        just_inside = 28.6328 + (waqi.MAX_STATION_KM - 0.2) / 111
+        just_outside = 28.6328 + (waqi.MAX_STATION_KM + 0.2) / 111
+        self._answer(monkeypatch, {"city": {"geo": [just_inside, 77.2197]}, "iaqi": {}})
+        assert waqi.nearest_station(ZONES[0], "token") is not None
+        self._answer(monkeypatch, {"city": {"geo": [just_outside, 77.2197]}, "iaqi": {}})
+        assert waqi.nearest_station(ZONES[0], "token") is None
 
 
 class TestRejectionIsNotAnOutage:
-    def test_a_bad_token_raises_rather_than_looking_like_no_stations(self, monkeypatch) -> None:
+    def test_a_bad_token_raises_rather_than_looking_like_an_unmonitored_country(self, monkeypatch) -> None:
         # WAQI answers HTTP 200 with {"status":"error","data":"Invalid key"}.
         # Read as a transport failure this would retry three times and then
-        # report zero stations, which is indistinguishable from a country with
-        # no monitoring — the single most misleading thing this could do.
+        # report no station for any zone, which is indistinguishable from a
+        # country with no monitoring — the single most misleading thing this could do.
         calls = []
 
         class Response:
@@ -65,7 +84,7 @@ class TestRejectionIsNotAnOutage:
         monkeypatch.setattr(waqi.time, "sleep", lambda _: None)
 
         with pytest.raises(waqi.NotAuthorised):
-            waqi._get("/map/bounds/", {}, "wrong-token", attempts=3)
+            waqi._get("/feed/geo:28.63;77.22/", {}, "wrong-token", attempts=3)
 
         # Asked once, not three times. A rejected token is rejected on every
         # retry, and the retries turn a one-line configuration problem into a
@@ -85,37 +104,8 @@ class TestRejectionIsNotAnOutage:
         monkeypatch.setattr(waqi.time, "sleep", lambda _: None)
 
         with pytest.raises(RuntimeError) as excinfo:
-            waqi._get("/map/bounds/", {}, "token", attempts=2)
+            waqi._get("/feed/geo:28.63;77.22/", {}, "token", attempts=2)
         assert not isinstance(excinfo.value, waqi.NotAuthorised)
-
-
-class TestReadingTheStationList:
-    def _stub(self, monkeypatch, payload):
-        monkeypatch.setattr(waqi, "_get", lambda *a, **k: payload)
-
-    def test_it_reads_position_and_identity(self, monkeypatch) -> None:
-        self._stub(monkeypatch, [
-            {"uid": 11, "lat": 28.63, "lon": 77.22, "aqi": "160",
-             "station": {"name": "Anand Vihar"}},
-        ])
-        stations = waqi.stations_in((0, 0, 1, 1), "token")
-        assert [(s.uid, s.name) for s in stations] == [(11, "Anand Vihar")]
-
-    def test_an_entry_with_no_position_is_dropped(self, monkeypatch) -> None:
-        # Not defaulted to zero. (0, 0) is in the Gulf of Guinea, and a station
-        # placed there would simply never match a zone — the row would vanish
-        # silently instead of being reported as unusable.
-        self._stub(monkeypatch, [
-            {"uid": 11, "lat": None, "lon": 77.22, "station": {"name": "Broken"}},
-            {"uid": 12, "lat": 28.63, "lon": 77.22, "station": {"name": "Fine"}},
-        ])
-        assert [s.name for s in waqi.stations_in((0, 0, 1, 1), "token")] == ["Fine"]
-
-    def test_a_station_with_no_name_still_counts(self, monkeypatch) -> None:
-        # The name is for the log. Dropping a positioned station over a missing
-        # label would throw away a measurement to protect a print statement.
-        self._stub(monkeypatch, [{"uid": 13, "lat": 28.63, "lon": 77.22}])
-        assert len(waqi.stations_in((0, 0, 1, 1), "token")) == 1
 
 
 class TestFreshness:
