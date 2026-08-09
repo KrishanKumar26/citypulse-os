@@ -98,21 +98,12 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * radius * math.asin(math.sqrt(a))
 
 
-def fetch(api_key: str, limit: int = 2000, *, attempts: int = 3,
-          timeout: float = 90.0) -> list[dict]:
-    """Read the national feed, retrying a slow or dropped connection.
-
-    data.gov.in answers this resource in a second or two most of the time and
-    occasionally not at all: the first scheduled run died on
-    `TimeoutError: The read operation timed out` at 30 seconds, having asked for
-    every station in the country in one request.
-
-    Retried rather than merely given longer, because the failure is a dropped or
-    stalled connection, not a slow one — a longer single wait would have failed
-    identically, an hour later. Backs off between attempts so a struggling
-    upstream is not asked three times in three seconds.
-    """
-    query = urllib.parse.urlencode({"api-key": api_key, "format": "json", "limit": limit})
+def _fetch_page(api_key: str, limit: int, offset: int, attempts: int,
+                timeout: float) -> list[dict]:
+    """One page, retried. A dropped connection is not a reason to lose the run."""
+    query = urllib.parse.urlencode({
+        "api-key": api_key, "format": "json", "limit": limit, "offset": offset,
+    })
     request = urllib.request.Request(f"{ENDPOINT}?{query}",
                                      headers={"Accept": "application/json"})
 
@@ -125,10 +116,46 @@ def fetch(api_key: str, limit: int = 2000, *, attempts: int = 3,
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             last = exc
             if attempt < attempts:
-                print(f"  attempt {attempt} failed ({exc}); retrying", flush=True)
+                print(f"    offset {offset}: attempt {attempt} failed ({exc}); retrying",
+                      flush=True)
                 time.sleep(5 * attempt)
 
-    raise RuntimeError(f"CPCB feed unreachable after {attempts} attempts: {last}")
+    raise RuntimeError(
+        f"CPCB feed unreachable at offset {offset} after {attempts} attempts: {last}")
+
+
+def fetch(api_key: str, *, page_size: int = 500, max_records: int = 20_000,
+          attempts: int = 3, timeout: float = 90.0) -> list[dict]:
+    """Read the national feed a page at a time.
+
+    Asking for the whole country in one request did not work. The first
+    scheduled run timed out at thirty seconds; raising the timeout and retrying
+    produced three HTTP 502s from the gateway, each after about a minute. The
+    same endpoint answers a one-record request in under a second, so the size of
+    the request was the problem, not the service.
+
+    Paging also fixes a quieter bug. The feed returns a row per pollutant per
+    station — roughly six for each of several hundred stations — so the previous
+    `limit=2000` was already truncating the national feed, and doing it
+    silently: a station missing from the response is indistinguishable from a
+    station that reported nothing.
+
+    `max_records` is a stop, not an expectation. It bounds a feed that has grown
+    or a server that pages forever; reaching it says so rather than returning a
+    quietly partial answer.
+    """
+    records: list[dict] = []
+    offset = 0
+
+    while len(records) < max_records:
+        page = _fetch_page(api_key, page_size, offset, attempts, timeout)
+        records.extend(page)
+        if len(page) < page_size:
+            return records
+        offset += page_size
+
+    print(f"  stopped at {max_records} records; the feed had more", flush=True)
+    return records
 
 
 def parse_stations(records: list[dict]) -> list[Station]:
