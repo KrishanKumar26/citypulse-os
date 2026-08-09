@@ -63,6 +63,30 @@ class CityApiIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("zone search returns the whole city when no term is given")
+    void zoneSearchWithoutATermReturnsEveryZone() throws Exception {
+        Tokens viewer = loginAs("zonesearch@example.com", RoleName.VIEWER);
+
+        String body = mockMvc.perform(authGet("/api/v1/cities/by-slug/noida", viewer.accessToken()))
+                .andReturn().getResponse().getContentAsString();
+        String cityId = objectMapper.readTree(body).path("data").path("id").asText();
+
+        // The omitted term is the case that failed: a null parameter reaching
+        // LOWER() has no type for PostgreSQL to infer, so it was read as bytea.
+        mockMvc.perform(authGet("/api/v1/cities/" + cityId + "/zones/search", viewer.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalItems").value(6));
+
+        // Term without a space: MockMvc re-encodes the template, so a literal
+        // %20 here would be searched for as "%20" rather than a space.
+        mockMvc.perform(authGet("/api/v1/cities/" + cityId + "/zones/search?search=S18",
+                        viewer.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalItems").value(1))
+                .andExpect(jsonPath("$.data.items[0].code").value("NOI-S18"));
+    }
+
+    @Test
     @DisplayName("an unknown city returns 404 with the standard envelope")
     void unknownCityReturnsNotFound() throws Exception {
         Tokens viewer = loginAs("missing@example.com", RoleName.VIEWER);

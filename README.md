@@ -8,35 +8,48 @@ lets an operator test hypothetical scenarios against them, and flags departures
 from what a place normally does.
 
 Built to the product requirements in [`docs/PRD.md`](docs/PRD.md). Phases 0–7 of
-[the plan](docs/DEVELOPMENT_PLAN.md) are complete and verified; 8–9 are not.
+[the plan](docs/DEVELOPMENT_PLAN.md) are complete and verified. Phase 8 (CI,
+containers, deployment) has not been started. Several Phase 9 surfaces have
+shipped — API key management, demo-mode labelling, the analytics and data
+screens — but the phase is not closed: its performance and accessibility exit
+criteria remain unmeasured, so it is still listed as pending.
 
 ---
 
 ## What actually works
 
-Seven of eleven planned modules are live. The other four state plainly that they
-are not built rather than presenting controls that do nothing.
+Fourteen modules are live across ten Indian metros. Digital Twin is the one
+planned module that is not built, and nothing in the interface pretends
+otherwise.
 
-| Module | State | What it does |
-|---|---|---|
-| Command Center | live | City map coloured by measured risk, KPI tiles, zone detail |
-| Live Intelligence | live | Streaming conditions over SSE, per-zone readings and history |
-| Alert Center | live | Automatically raised alerts with the measurement behind each |
-| Forecast Engine | live | Five horizons per zone, with the model's measured error |
-| What-If Simulator | live | Scenarios run against real observed conditions |
-| AI Insights | live | Anomalies, measured correlations, City Memory |
-| Settings | live | Profile and session management |
-| Analytics · Data Sources · API Keys · Digital Twin | not built | Phase 9 |
+| Module | What it does |
+|---|---|
+| Command Center | City map coloured by measured risk, KPI tiles, zone detail |
+| Live Intelligence | Streaming conditions over SSE, per-zone readings and history |
+| AI Insights | Correlations, City Memory, and what the platform declines to say |
+| Anomaly Detection | Departures from what a zone normally does at this hour |
+| Forecast Engine | Five horizons per zone, with the model's measured error |
+| What-If Simulator | Scenarios run against real observed conditions |
+| Alerts | Automatically raised alerts with the measurement behind each |
+| Action Center | Response plans: the step between an alert and an action |
+| Impact | What actually followed a recorded action, against the zone's baseline |
+| City Analytics | Curated series over 1h–30d, with the coverage behind each point |
+| Data Sources | Feed inventory and which ones have gone silent |
+| Data Health | What the pipeline received against what it kept |
+| API Management | Scoped API keys, shown once and stored hashed |
+| Settings | Profile and session management |
+| Digital Twin | *not built* |
 
 ### Verified, not asserted
 
 | Suite | Count |
 |---|---|
-| Backend (JUnit) | 197 |
-| Data platform (pytest) | 187 |
+| Backend unit (JUnit, surefire) | 87 |
+| Backend integration (JUnit, failsafe, real PostgreSQL) | 157 |
+| Data platform (pytest) | 223 |
 | dbt models and tests | 108 |
-| Frontend (Vitest) | 51 |
-| **Total** | **543** |
+| Frontend (Vitest) | 73 |
+| **Total** | **648** |
 
 Plus two end-to-end shell suites under [`docs/verification/`](docs/verification/)
 that drive the running stack over HTTP.
@@ -137,11 +150,21 @@ set -a && . ../.env && set +a
 cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt build # analytics marts
 ```
 
-For live conditions, run the generator continuously instead:
+Everything above is history: correct, but it stops at the moment you loaded it,
+and the dashboard says so — an unmeasured present renders as *"Not measured"*,
+not as a calm city. To keep the present moving, run the live loop:
 
 ```bash
-.venv/bin/python -m generator.main --sink jsonl --out /tmp/live.jsonl --tick-seconds 10
+bash data-engineering/scripts/live_loop.sh
 ```
+
+Each cycle reads the curated watermark, generates exactly the events up to the
+last *completed* five-minute window, and loads them. Ranges never overlap, so no
+raw event is written twice and no window is built from a partial batch. It ticks
+at the same rate as the backfill above, deliberately: a window's `vehicle_count`
+is a **sum** over the readings inside it, so a denser live rate would inflate
+every window against a baseline learned at the old one, and the detector would
+report a spike that belongs to the generator rather than the city.
 
 ---
 

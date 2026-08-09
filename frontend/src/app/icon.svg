@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none">
+  <!-- The same mark the sidebar draws, so the browser tab and the header agree.
+       Colours are literal rather than tokens: this is served as a standalone
+       file, with no stylesheet to resolve var() against. -->
+  <rect width="24" height="24" rx="5" fill="#080b14" />
+  <rect x="1.5" y="1.5" width="21" height="21" rx="5" stroke="#22d3ee" stroke-width="1.5" />
+  <path d="M5 14.5h3l2-5 2.5 8 2-6 1.5 3H19" stroke="#22d3ee" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round" />
+</svg>

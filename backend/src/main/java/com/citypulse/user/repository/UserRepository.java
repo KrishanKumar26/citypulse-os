@@ -34,13 +34,30 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmailAndDeletedAtIsNull(String email);
 
-    @EntityGraph(attributePaths = {"roles"})
+    /**
+     * Deliberately carries no {@code @EntityGraph}. A graph over the {@code roles}
+     * collection becomes a fetch join, and Hibernate refuses to paginate one:
+     * the join multiplies rows per user, so {@code LIMIT} would cut a user in
+     * half rather than cut the list. It fails closed —
+     * {@code fail_on_pagination_over_collection_fetch} throws instead of quietly
+     * paging in memory — so every call to this method returned 500.
+     *
+     * <p>Nothing is lost by leaving it off: {@code User.roles} is already
+     * {@code FetchType.EAGER}, so {@link com.citypulse.user.dto.UserMapper#toSummary}
+     * still gets the role names it needs.
+     *
+     * <p>{@code :search} is cast explicitly because it is nullable. PostgreSQL
+     * is asked to type a parameter it has never seen a value for, defaults the
+     * untyped null to {@code bytea}, and then cannot find
+     * {@code lower(bytea)} — so an unfiltered listing failed while a search for
+     * a term succeeded.
+     */
     @Query("""
             SELECT u FROM User u
             WHERE u.deletedAt IS NULL
-              AND (:search IS NULL
-                   OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))
-                   OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (CAST(:search AS string) IS NULL
+                   OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                   OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             """)
     Page<User> search(@Param("search") String search, Pageable pageable);
 }

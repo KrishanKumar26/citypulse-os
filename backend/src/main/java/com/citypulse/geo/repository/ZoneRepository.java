@@ -30,14 +30,21 @@ public interface ZoneRepository extends JpaRepository<Zone, Long> {
             """)
     List<Zone> findByCity(@Param("cityId") Long cityId, @Param("activeOnly") boolean activeOnly);
 
+    /**
+     * {@code :search} is cast because it is nullable. Without the cast
+     * PostgreSQL has no value from which to infer the parameter's type, falls
+     * back to {@code bytea} for the untyped null, and then fails to find
+     * {@code lower(bytea)} — so browsing a city's zones without a search term
+     * returned 500 while searching for one worked.
+     */
     @EntityGraph(attributePaths = {"city"})
     @Query("""
             SELECT z FROM Zone z
              WHERE z.city.id = :cityId
                AND z.deletedAt IS NULL
-               AND (:search IS NULL
-                    OR LOWER(z.name) LIKE LOWER(CONCAT('%', :search, '%'))
-                    OR LOWER(z.code) LIKE LOWER(CONCAT('%', :search, '%')))
+               AND (CAST(:search AS string) IS NULL
+                    OR LOWER(z.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                    OR LOWER(z.code) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             """)
     Page<Zone> search(@Param("cityId") Long cityId, @Param("search") String search, Pageable pageable);
 

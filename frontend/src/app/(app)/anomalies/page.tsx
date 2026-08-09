@@ -400,10 +400,14 @@ function AnomalyDetailPanel({ anomaly }: { anomaly: AnomalyDetail | null }) {
               that spiked in a single window print the same percentage.
             </p>
           </div>
+        ) : historyQuery.isLoading ? (
+          // Sibling of the <p> rather than inside it: Skeleton renders a <div>,
+          // which a <p> may not contain. The browser silently closed the
+          // paragraph early, so the server and client markup disagreed and
+          // hydration failed on every visit to this panel.
+          <Skeleton className="mt-1.5 h-8 w-40" />
         ) : (
-          <p className="mt-1.5 text-[12px] text-content-disabled">
-            {historyQuery.isLoading ? <Skeleton className="h-8 w-40" /> : "Insufficient history to plot"}
-          </p>
+          <p className="mt-1.5 text-[12px] text-content-disabled">Insufficient history to plot</p>
         )}
       </section>
 

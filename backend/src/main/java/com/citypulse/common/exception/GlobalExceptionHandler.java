@@ -19,6 +19,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -122,6 +123,23 @@ public class GlobalExceptionHandler {
         log.warn("Data integrity violation", ex);
         return build(HttpStatus.CONFLICT,
                 ApiError.of("RESOURCE_CONFLICT", "The request conflicts with existing data", requestId()));
+    }
+
+    /**
+     * The client went away mid-response. On an SSE subscription that is an
+     * ordinary navigation — the browser closes the stream when the operator
+     * leaves the page.
+     *
+     * <p>Handled separately, and returning nothing, because the response is
+     * already unusable: letting it reach {@link #handleUnexpected} logged a
+     * stack trace at ERROR and then failed a second time trying to serialise
+     * a JSON envelope onto a {@code text/event-stream} connection. Neither
+     * says anything about the health of this service.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientDisconnect(AsyncRequestNotUsableException ex, HttpServletRequest request) {
+        log.debug("Client disconnected from {} {}: {}",
+                request.getMethod(), request.getRequestURI(), ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
