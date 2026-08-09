@@ -12,7 +12,9 @@ import type { ApiError, ApiResponse } from "./types";
  * to httpOnly cookies is recorded as a hardening step in docs/SECURITY.md.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+/** Exported so the one definition of where the API lives is used everywhere. */
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 const REFRESH_STORAGE_KEY = "citypulse.refresh";
 
 /** Thrown for any non-2xx response, carrying the backend's error envelope. */
