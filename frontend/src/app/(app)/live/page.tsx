@@ -21,6 +21,7 @@ import type { ConditionLevel, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
 import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
 import { describeAqi } from "@/lib/provenance";
+import { AqiValue } from "@/components/live/AqiValue";
 
 const ZoneMap = dynamic(() => import("@/components/map/ZoneMap"), {
   ssr: false,
@@ -356,7 +357,9 @@ function ZoneConditionTable({
                   <td className="px-5 py-2.5 text-right tabular">
                     {zone.averageSpeedKph ? Number(zone.averageSpeedKph).toFixed(0) : "—"}
                   </td>
-                  <td className="px-5 py-2.5 text-right tabular">{zone.aqi ?? "—"}</td>
+                  <td className="px-5 py-2.5 text-right tabular">
+                    <AqiValue aqi={zone.aqi} source={zone.aqiSource} />
+                  </td>
                   <td className="px-5 py-2.5 text-right tabular">
                     {zone.hasData ? zone.activeIncidents : "—"}
                   </td>

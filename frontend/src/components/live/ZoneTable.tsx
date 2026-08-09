@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Badge, Card, CardHeader, EmptyState, Input, LoadingState, cn } from "@/components/ui";
 import { TrendBadge } from "@/components/charts/Sparkline";
 import type { AirProvenance, ConditionLevel, Zone, ZoneCondition } from "@/lib/api/types";
-import { PROVENANCE_DETAIL, PROVENANCE_LABEL } from "@/lib/provenance";
+import { AqiValue } from "@/components/live/AqiValue";
 
 /**
  * Every zone's current condition, sortable and filterable.
@@ -245,7 +245,9 @@ export function ZoneTable({
                     </td>
                     <Cell value={r.occupancy} suffix="%" decimals={0} />
                     <Cell value={r.speed} suffix=" km/h" decimals={1} />
-                    <AqiCell aqi={r.aqi} source={r.aqiSource} />
+                    <td className="px-4 py-2.5 text-right tabular">
+                      <AqiValue aqi={r.aqi} source={r.aqiSource} />
+                    </td>
                     <Cell value={r.incidents} decimals={0} />
                     <Cell value={r.risk} decimals={0} strong />
                     <td className="px-4 py-2.5 text-right">
@@ -259,43 +261,6 @@ export function ZoneTable({
         </div>
       )}
     </Card>
-  );
-}
-
-/**
- * AQI, and where it came from.
- *
- * The marker is here and not only in the detail panel because the table is
- * where zones are compared. Two rows reading 140 and 150 look like the same
- * kind of fact, and on this deployment one of them can be an instrument and the
- * other a model — a difference the reader cannot recover from the number.
- *
- * One letter rather than a badge: a coloured pill on every row of a
- * sixty-two-row table would drown the risk column, which is what the table is
- * for. The full wording is on hover and spelled out in the detail panel.
- */
-function AqiCell({ aqi, source }: { aqi: number | null; source: AirProvenance | null }) {
-  return (
-    <td className="px-4 py-2.5 text-right tabular">
-      {aqi === null ? (
-        <span className="text-content-disabled">—</span>
-      ) : (
-        <span className="text-content-secondary">
-          {aqi}
-          {source && (
-            <span
-              title={PROVENANCE_DETAIL[source]}
-              className={cn(
-                "ml-1 text-[10px] uppercase",
-                source === "SYNTHETIC" ? "text-status-moderate" : "text-content-tertiary",
-              )}
-            >
-              {PROVENANCE_LABEL[source].charAt(0)}
-            </span>
-          )}
-        </span>
-      )}
-    </td>
   );
 }
 

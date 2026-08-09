@@ -209,7 +209,13 @@ def _parse_moment(time_block: dict | None) -> datetime | None:
 
 
 def main() -> int:
-    token = os.environ.get("WAQI_API_TOKEN")
+    raw = os.environ.get("WAQI_API_TOKEN") or ""
+    # Stripped, and the fact that it needed stripping is reported below.
+    # `printf %s | gh secret set` keeps the newline, and a secret is invisible
+    # once stored — so a token that is correct apart from a trailing newline
+    # fails exactly like a wrong one, forever, with nothing on screen to
+    # distinguish them.
+    token = raw.strip()
     if not token:
         print("WAQI_API_TOKEN is not set. Nothing was fetched and nothing was written.\n"
               "A token is free from https://aqicn.org/data-platform/token/ — there is\n"
@@ -249,6 +255,14 @@ def main() -> int:
                 # describes urllib, and the thing that needs changing is a
                 # secret in a settings page.
                 print(f"  {exc}")
+                # Enough shape to tell a truncated paste from a dead token, and
+                # nothing that could reconstruct it. The token travels in a
+                # query string, so neither it nor the URL is ever printed.
+                print(f"  The token this run used is {len(token)} characters"
+                      + (f", after stripping {len(raw) - len(token)} character(s) "
+                         f"of whitespace GitHub had stored with it"
+                         if len(raw) != len(token) else " and had no stray whitespace")
+                      + ".")
                 print("  Nothing was fetched and nothing was written.")
                 return 1
             except RuntimeError as exc:
