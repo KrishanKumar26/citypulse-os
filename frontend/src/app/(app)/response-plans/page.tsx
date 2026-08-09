@@ -175,7 +175,7 @@ function PlanCard({ plan }: { plan: ResponsePlan }) {
               style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="tabular text-[11.5px] text-content-secondary">
+          <span className="tabular text-[11px] text-content-secondary">
             {plan.stepsDone} of {plan.stepsTotal}
           </span>
           {plan.stepsBlocked > 0 && (
@@ -197,17 +197,17 @@ function PlanCard({ plan }: { plan: ResponsePlan }) {
                   {s.fromAlertRule && (
                     // Marked, always. A rule's recommendation and a person's
                     // instruction must never read as the same kind of thing.
-                    <span className="rounded border border-line-default px-1.5 py-px text-[9.5px] uppercase tracking-wide text-content-tertiary">
+                    <span className="rounded border border-line-default px-1.5 py-px text-[10px] uppercase tracking-wide text-content-tertiary">
                       From alert rule
                     </span>
                   )}
                   {s.completedBy && (
-                    <span className="text-[10.5px] text-content-tertiary">
+                    <span className="text-[10px] text-content-tertiary">
                       done by {s.completedBy}
                     </span>
                   )}
                   {s.note && (
-                    <span className="text-[10.5px] text-status-high">{s.note}</span>
+                    <span className="text-[10px] text-status-high">{s.note}</span>
                   )}
                 </div>
               </div>
@@ -288,7 +288,7 @@ function PlanCard({ plan }: { plan: ResponsePlan }) {
           </>
         )}
         {(plan.status === "COMPLETED" || plan.status === "CANCELLED") && (
-          <span className="text-[11.5px] text-content-tertiary">
+          <span className="text-[11px] text-content-tertiary">
             Closed {plan.closedAt ? new Date(plan.closedAt).toLocaleString() : ""}
           </span>
         )}

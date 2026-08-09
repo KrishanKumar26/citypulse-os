@@ -96,7 +96,7 @@ export default function DataSourcesPage() {
               description={`Row counts are measured over the last ${data.windowHours} hours from the event tables, not read from each source's own timestamp.`}
             />
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[12.5px]">
+              <table className="w-full text-left text-[12px]">
                 <thead>
                   <tr className="border-b border-line-subtle text-[11px] text-content-tertiary">
                     <th scope="col" className="px-4 py-2.5 font-medium">Source</th>
@@ -121,7 +121,7 @@ export default function DataSourcesPage() {
 
           <Attributions sources={data.sources} />
 
-          <p className="text-[11.5px] leading-relaxed text-content-tertiary">
+          <p className="text-[11px] leading-relaxed text-content-tertiary">
             Traffic, weather, incidents and city events are synthetic, and labelled so. That is
             the platform&rsquo;s design rather than a gap: it runs with no external API at all, so
             the pipeline, the models and the dashboard can be exercised end to end without
@@ -141,7 +141,7 @@ function Row({ source }: { source: DataSourceSummary }) {
     <tr className="border-b border-line-subtle last:border-0 hover:bg-surface-hover">
       <td className="px-4 py-2.5">
         <span className="block text-content-primary">{source.name}</span>
-        <span className="text-[10.5px] text-content-tertiary">{source.code}</span>
+        <span className="text-[10px] text-content-tertiary">{source.code}</span>
       </td>
       <td className="px-4 py-2.5 text-content-secondary">
         {TYPE_LABEL[source.sourceType] ?? source.sourceType}
@@ -209,7 +209,7 @@ function Attributions({ sources }: { sources: DataSourceSummary[] }) {
         title="Data attribution"
         description="Required by the licences the real feeds are used under."
       />
-      <ul className="flex flex-wrap gap-x-4 gap-y-1.5 px-5 pb-4 text-[11.5px] text-content-tertiary">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1.5 px-5 pb-4 text-[11px] text-content-tertiary">
         {[...credits.values()].map((credit) => (
           <li key={`${credit.name}|${credit.url}`}>
             {credit.url ? (

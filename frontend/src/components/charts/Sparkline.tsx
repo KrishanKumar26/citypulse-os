@@ -153,7 +153,7 @@ export function TrendBadge({
   className?: string;
 }) {
   if (change === null) {
-    return <span className={`text-[10.5px] text-content-disabled ${className ?? ""}`}>no trend yet</span>;
+    return <span className={`text-[10px] text-content-disabled ${className ?? ""}`}>no trend yet</span>;
   }
 
   // Below this, a reading is noise rather than movement, and an arrow would
@@ -169,7 +169,7 @@ export function TrendBadge({
       : "text-status-normal";
 
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10.5px] font-medium tabular ${tone} ${className ?? ""}`}>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium tabular ${tone} ${className ?? ""}`}>
       <span aria-hidden="true">{flat ? "→" : change > 0 ? "↑" : "↓"}</span>
       {flat ? "steady" : `${Math.abs(change).toFixed(0)}%`}
     </span>

@@ -164,7 +164,7 @@ export function ZoneRiskChart({
               >
                 <span
                   className={cn(
-                    "truncate text-[11.5px]",
+                    "truncate text-[11px]",
                     active ? "text-content-primary" : "text-content-secondary",
                   )}
                   style={{ width: LABEL_WIDTH }}
@@ -175,7 +175,7 @@ export function ZoneRiskChart({
                 <span className="flex-1" />
                 <span
                   className={cn(
-                    "tabular text-right text-[11.5px] font-medium",
+                    "tabular text-right text-[11px] font-medium",
                     active ? "text-content-primary" : "text-content-secondary",
                   )}
                   style={{ width: VALUE_WIDTH }}

@@ -56,7 +56,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         </main>
 
         <footer className="px-6 pb-6 lg:hidden">
-          <p className="text-[11.5px] leading-relaxed text-content-disabled">
+          <p className="text-[11px] leading-relaxed text-content-disabled">
             Demonstration environment. Traffic, weather and incidents are synthetic
             and labelled as such; air quality is real.
           </p>

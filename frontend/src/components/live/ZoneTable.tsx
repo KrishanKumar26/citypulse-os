@@ -161,7 +161,7 @@ export function ZoneTable({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search zone or code"
-          className="h-8 w-full max-w-[220px] text-[12.5px]"
+          className="h-8 w-full max-w-[220px] text-[12px]"
         />
         <div className="flex flex-wrap items-center gap-1">
           <FilterChip active={levelFilter === "ALL"} onClick={() => setLevelFilter("ALL")}>
@@ -203,7 +203,7 @@ export function ZoneTable({
         />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[12.5px]">
+          <table className="w-full text-left text-[12px]">
             <thead>
               <tr className="border-b border-line-subtle text-[11px] text-content-tertiary">
                 <SortableHeader label="Zone" col="name" sort={sort} setSort={setSort} align="left" />
@@ -231,7 +231,7 @@ export function ZoneTable({
                   >
                     <td className="px-4 py-2.5">
                       <span className="block text-content-primary">{r.zone.name}</span>
-                      <span className="text-[10.5px] text-content-tertiary">{r.zone.code}</span>
+                      <span className="text-[10px] text-content-tertiary">{r.zone.code}</span>
                     </td>
                     <td className="px-4 py-2.5">
                       {r.level ? (
@@ -318,7 +318,7 @@ function SortableHeader({
         )}
       >
         {label}
-        <span aria-hidden="true" className={cn("text-[9px]", !active && "opacity-0")}>
+        <span aria-hidden="true" className={cn("text-[10px]", !active && "opacity-0")}>
           {sort.desc ? "▼" : "▲"}
         </span>
       </button>

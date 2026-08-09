@@ -58,7 +58,7 @@ export function LiftChart({ correlations }: { correlations: Correlation[] }) {
           <span
             key={tick}
             className={cn(
-              "absolute top-0 -translate-x-1/2 text-[9.5px] tabular",
+              "absolute top-0 -translate-x-1/2 text-[10px] tabular",
               tick === 1 ? "font-medium text-content-secondary" : "text-content-disabled",
             )}
             style={{ left: `${(tick / AXIS_MAX) * 100}%` }}
@@ -82,7 +82,7 @@ export function LiftChart({ correlations }: { correlations: Correlation[] }) {
               onMouseLeave={() => setHovered(null)}
             >
               <div className="flex items-baseline justify-between gap-3">
-                <span className="min-w-0 truncate text-[11.5px] text-content-secondary">
+                <span className="min-w-0 truncate text-[11px] text-content-secondary">
                   {readable(c.conditionA)}
                   <span className="text-content-disabled"> → </span>
                   {readable(c.conditionB)}
@@ -130,7 +130,7 @@ export function LiftChart({ correlations }: { correlations: Correlation[] }) {
         })}
       </ul>
 
-      <p className="mt-4 border-t border-line-subtle pt-3 text-[10.5px] leading-relaxed text-content-tertiary">
+      <p className="mt-4 border-t border-line-subtle pt-3 text-[10px] leading-relaxed text-content-tertiary">
         These are co-occurrences, not causes. A pair can move together because one
         drives the other, because something else drives both, or by chance over a
         finite number of windows. The platform measures how often they appear

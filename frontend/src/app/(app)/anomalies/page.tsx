@@ -129,7 +129,7 @@ export default function AnomaliesPage() {
               onClick={() => setHours(range.hours)}
               aria-pressed={hours === range.hours}
               className={cn(
-                "rounded-md border px-2.5 py-1 text-[11.5px] font-medium transition-colors",
+                "rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
                 hours === range.hours
                   ? "border-accent/40 bg-accent-subtle text-accent"
                   : "border-line-default text-content-secondary hover:bg-surface-hover hover:text-content-primary",
@@ -167,7 +167,7 @@ export default function AnomaliesPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search zone or metric"
-                  className="h-8 w-full max-w-[220px] text-[12.5px]"
+                  className="h-8 w-full max-w-[220px] text-[12px]"
                 />
                 <Chip active={severity === "ALL"} onClick={() => setSeverity("ALL")}>
                   All
@@ -305,7 +305,7 @@ function DetectionRow({
             {TYPE_LABEL[anomaly.anomalyType] ?? anomaly.anomalyType}
           </span>
         </span>
-        <span className="tabular text-right text-[12.5px]">
+        <span className="tabular text-right text-[12px]">
           <span className={cn("font-medium", `text-status-${status}`)}>
             {scaled(anomaly.observedValue, anomaly.metric).toFixed(d)}
           </span>
@@ -313,10 +313,10 @@ function DetectionRow({
             {" "}vs {scaled(anomaly.baselineValue, anomaly.metric).toFixed(d)}
           </span>
         </span>
-        <span className="w-[54px] shrink-0 text-right tabular text-[11.5px] text-content-secondary">
+        <span className="w-[54px] shrink-0 text-right tabular text-[11px] text-content-secondary">
           {change === null ? "—" : `${change > 0 ? "+" : ""}${change.toFixed(0)}%`}
         </span>
-        <span className="w-[62px] shrink-0 text-right text-[10.5px] text-content-tertiary">
+        <span className="w-[62px] shrink-0 text-right text-[10px] text-content-tertiary">
           {new Date(anomaly.windowStart).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
       </button>
@@ -395,7 +395,7 @@ function AnomalyDetailPanel({ anomaly }: { anomaly: AnomalyDetail | null }) {
         {series.filter((v) => v !== null).length >= 2 ? (
           <div className="mt-2">
             <Sparkline points={series} width={260} height={44} ariaLabel="Zone history around the detection" />
-            <p className="mt-1.5 text-[10.5px] text-content-tertiary">
+            <p className="mt-1.5 text-[10px] text-content-tertiary">
               The zone&rsquo;s recent curated windows. A reading that climbed for an hour and one
               that spiked in a single window print the same percentage.
             </p>
@@ -414,10 +414,10 @@ function AnomalyDetailPanel({ anomaly }: { anomaly: AnomalyDetail | null }) {
       <section className="border-b border-line-subtle px-5 py-4">
         <Label>Why this was flagged</Label>
         {/* Written at detection time, so it stays true as the detector changes. */}
-        <p className="mt-1.5 text-[12.5px] leading-relaxed text-content-secondary">
+        <p className="mt-1.5 text-[12px] leading-relaxed text-content-secondary">
           {anomaly.explanation}
         </p>
-        <p className="mt-2 text-[10.5px] text-content-tertiary">
+        <p className="mt-2 text-[10px] text-content-tertiary">
           Baseline is the median and MAD of {anomaly.baselineSamples} historical windows for this
           zone at this hour of the week — not a fixed threshold, which is what alerts use.
         </p>
@@ -441,19 +441,19 @@ function AnomalyDetailPanel({ anomaly }: { anomaly: AnomalyDetail | null }) {
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Link
             href="/command-center"
-            className="rounded-md border border-accent/40 bg-accent-subtle px-2.5 py-1 text-[11.5px] font-medium text-accent transition-colors hover:bg-accent-muted"
+            className="rounded-md border border-accent/40 bg-accent-subtle px-2.5 py-1 text-[11px] font-medium text-accent transition-colors hover:bg-accent-muted"
           >
             View zone
           </Link>
           <Link
             href="/forecast"
-            className="rounded-md border border-line-default px-2.5 py-1 text-[11.5px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
+            className="rounded-md border border-line-default px-2.5 py-1 text-[11px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
           >
             View forecast
           </Link>
           <Link
             href="/simulator"
-            className="rounded-md border border-line-default px-2.5 py-1 text-[11.5px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
+            className="rounded-md border border-line-default px-2.5 py-1 text-[11px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
           >
             Run simulation
           </Link>
@@ -498,7 +498,7 @@ function ZoneRanking({
               onClick={() => onSelectZone(row.worst.id)}
               className="flex w-full items-center gap-3 py-1.5 text-left"
             >
-              <span className="w-[104px] shrink-0 truncate text-[11.5px] text-content-secondary">
+              <span className="w-[104px] shrink-0 truncate text-[11px] text-content-secondary">
                 {row.name}
               </span>
               <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-hover">
@@ -510,7 +510,7 @@ function ZoneRanking({
                   }}
                 />
               </span>
-              <span className="w-6 shrink-0 text-right tabular text-[11.5px] text-content-secondary">
+              <span className="w-6 shrink-0 text-right tabular text-[11px] text-content-secondary">
                 {row.count}
               </span>
             </button>

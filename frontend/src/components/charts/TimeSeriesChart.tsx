@@ -93,7 +93,7 @@ export function TimeSeriesChart({
             <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)}
                   stroke="var(--color-line-subtle)" strokeWidth={1} />
             <text x={PAD.left - 7} y={y(t) + 3.5} textAnchor="end"
-                  className="fill-[var(--color-content-tertiary)] text-[9.5px] tabular">
+                  className="fill-[var(--color-content-tertiary)] text-[10px] tabular">
               {t.toFixed(decimals)}
             </text>
           </g>
@@ -127,11 +127,11 @@ export function TimeSeriesChart({
           </>
         )}
 
-        <text x={PAD.left} y={H - 7} className="fill-[var(--color-content-tertiary)] text-[9.5px]">
+        <text x={PAD.left} y={H - 7} className="fill-[var(--color-content-tertiary)] text-[10px]">
           {timeLabel(tMin)}
         </text>
         <text x={W - PAD.right} y={H - 7} textAnchor="end"
-              className="fill-[var(--color-content-tertiary)] text-[9.5px]">
+              className="fill-[var(--color-content-tertiary)] text-[10px]">
           {timeLabel(tMax)}
         </text>
 

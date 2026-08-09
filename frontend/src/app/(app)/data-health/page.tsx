@@ -158,7 +158,7 @@ export default function DataHealthPage() {
                       className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-content-disabled"
                     />
                     <div>
-                      <span className="text-[12.5px] text-content-secondary">
+                      <span className="text-[12px] text-content-secondary">
                         {STAGE_LABEL[stage]}
                       </span>
                       <p className="text-[11px] text-content-tertiary">{STAGE_NOTE[stage]}</p>
@@ -169,7 +169,7 @@ export default function DataHealthPage() {
             </Card>
           )}
 
-          <p className="text-[11.5px] leading-relaxed text-content-tertiary">
+          <p className="text-[11px] leading-relaxed text-content-tertiary">
             Validity is counted by the loader as records pass through it, not derived afterwards
             from the curated tables — a record that was rejected is not there to be counted, so a
             ratio computed after the fact would always read 100%. Feed-level delivery is on{" "}
@@ -208,7 +208,7 @@ function StageRow({ stage }: { stage: StageQuality }) {
     <section className="px-5 py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div>
-          <h3 className="text-[13.5px] font-medium text-content-primary">
+          <h3 className="text-[13px] font-medium text-content-primary">
             {STAGE_LABEL[stage.stage] ?? stage.stage}
           </h3>
           <p className="mt-0.5 text-[11px] text-content-tertiary">
@@ -259,7 +259,7 @@ function StageRow({ stage }: { stage: StageQuality }) {
         />
       </div>
 
-      <p className="mt-3 text-[10.5px] text-content-tertiary">
+      <p className="mt-3 text-[10px] text-content-tertiary">
         {stage.windows} {stage.windows === 1 ? "window" : "windows"} reported
         {stage.maxLagSeconds !== null ? (
           <> · worst lag {stage.maxLagSeconds}s</>

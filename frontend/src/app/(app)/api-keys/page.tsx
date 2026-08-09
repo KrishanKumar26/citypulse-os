@@ -121,7 +121,7 @@ export default function ApiKeysPage() {
         )}
       </Card>
 
-      <p className="text-[11.5px] leading-relaxed text-content-tertiary">
+      <p className="text-[11px] leading-relaxed text-content-tertiary">
         Keys authenticate with an <code className="text-content-secondary">X-API-Key</code> header,
         not <code className="text-content-secondary">Authorization</code>. A key carries the scopes
         it was issued with — frozen at creation, so it does not gain authority if your roles are
@@ -158,7 +158,7 @@ function SecretPanel({
       />
       <div className="px-5 py-4">
         <div className="flex flex-wrap items-center gap-2">
-          <code className="min-w-0 flex-1 overflow-x-auto rounded-md border border-line-default bg-surface-inset px-3 py-2.5 font-mono text-[12.5px] text-content-primary">
+          <code className="min-w-0 flex-1 overflow-x-auto rounded-md border border-line-default bg-surface-inset px-3 py-2.5 font-mono text-[12px] text-content-primary">
             {issued.secret}
           </code>
           <Button variant={copied ? "secondary" : "primary"} size="sm" onClick={onCopy}>
@@ -302,7 +302,7 @@ function KeyRow({
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-5 py-3.5">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13.5px] text-content-primary">{apiKey.name}</span>
+          <span className="text-[13px] text-content-primary">{apiKey.name}</span>
           {apiKey.active ? (
             <Badge level="normal">Active</Badge>
           ) : (
@@ -326,7 +326,7 @@ function KeyRow({
           ))}
         </div>
 
-        <p className="mt-1.5 text-[10.5px] text-content-tertiary">
+        <p className="mt-1.5 text-[10px] text-content-tertiary">
           Created {relative(apiKey.createdAt)}
           {apiKey.expiresAt && <> · expires {new Date(apiKey.expiresAt).toLocaleDateString()}</>}
           {" · "}

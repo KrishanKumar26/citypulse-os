@@ -77,7 +77,7 @@ export default function AnalyticsPage() {
               onClick={() => setHours(range.hours)}
               aria-pressed={hours === range.hours}
               className={cn(
-                "rounded-md border px-2.5 py-1 text-[11.5px] font-medium transition-colors",
+                "rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
                 hours === range.hours
                   ? "border-accent/40 bg-accent-subtle text-accent"
                   : "border-line-default text-content-secondary hover:bg-surface-hover hover:text-content-primary",
@@ -94,7 +94,7 @@ export default function AnalyticsPage() {
           windows, and a reader comparing this chart to the live tile deserves to
           know they are not the same resolution. */}
       {bucket != null && bucket > 5 && (
-        <p className="text-[11.5px] text-content-tertiary">
+        <p className="text-[11px] text-content-tertiary">
           Each point is a {bucket >= 60 ? `${bucket / 60}-hour` : `${bucket}-minute`} average.
           The curated window is 5 minutes; this range is folded so all of it is shown rather
           than the first part of it.

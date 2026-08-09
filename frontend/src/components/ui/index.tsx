@@ -178,7 +178,7 @@ export function CardHeader({ title, description, action }: {
           {title}
         </h2>
         {description && (
-          <p className="mt-1 text-[11.5px] leading-relaxed text-content-tertiary">{description}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-content-tertiary">{description}</p>
         )}
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -360,7 +360,10 @@ export function Metric({
       <span
         className={cn(
           "font-medium uppercase tracking-[0.09em] text-content-tertiary",
-          hero ? "text-[10.5px]" : "text-[9.5px]",
+          // A step apart, not half a step. These were 10.5 and 9.5, which is a
+          // difference no reader can see — the label above a hero metric has to
+          // look like a heading beside the ones that are not.
+          hero ? "text-[11px]" : "text-[10px]",
         )}
       >
         {label}

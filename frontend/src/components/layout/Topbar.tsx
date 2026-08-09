@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ApiStatus } from "@/components/system/ApiStatus";
 import { Badge, Button, DemoDataBadge } from "@/components/ui";
 import type { City, PlatformInfo } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session";
@@ -75,11 +76,12 @@ export function Topbar({
         Reports what the frontend can actually verify: that the API responded.
         It deliberately does not claim "all systems operational", which would be
         a status the frontend has no way to know.
+
+        It used to be a green dot and the words, unconditionally — true by
+        construction while the page was reachable at all, and a lie for as long
+        as it took anyone to notice the backend had gone. `ApiStatus` asks.
       */}
-      <div className="hidden items-center gap-2 md:flex">
-        <span className="h-1.5 w-1.5 rounded-full bg-status-normal pulse-dot" aria-hidden="true" />
-        <span className="text-[12px] text-content-tertiary">API connected</span>
-      </div>
+      <ApiStatus className="hidden md:flex" />
 
       {platform && (
         <Badge level="neutral" className="hidden lg:inline-flex">

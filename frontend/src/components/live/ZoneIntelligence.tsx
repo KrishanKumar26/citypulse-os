@@ -196,7 +196,7 @@ export function ZoneIntelligence({
                   {horizon.contributingFactors.slice(0, 3).map((factor) => (
                     <li
                       key={factor.feature}
-                      className="flex items-start gap-2 text-[11.5px] text-content-secondary"
+                      className="flex items-start gap-2 text-[11px] text-content-secondary"
                     >
                       <span aria-hidden="true" className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-ai" />
                       <span>
@@ -223,7 +223,7 @@ export function ZoneIntelligence({
         {action ? (
           <div
             className={cn(
-              "rounded-md border border-line-default bg-surface-inset px-3 py-2.5 text-[12.5px] leading-relaxed text-content-secondary",
+              "rounded-md border border-line-default bg-surface-inset px-3 py-2.5 text-[12px] leading-relaxed text-content-secondary",
             )}
           >
             {action}

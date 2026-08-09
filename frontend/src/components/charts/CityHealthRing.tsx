@@ -188,7 +188,7 @@ function Contributions({ kpis }: { kpis: CityKpis | null }) {
               />
             )}
           </div>
-          <span className="w-[86px] shrink-0 text-right text-[10.5px] tabular text-content-tertiary">
+          <span className="w-[86px] shrink-0 text-right text-[10px] tabular text-content-tertiary">
             {row.value === null ? "no reading" : row.suffix}
           </span>
         </div>

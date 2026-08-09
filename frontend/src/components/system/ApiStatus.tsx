@@ -43,7 +43,19 @@ const DOT: Record<Reachability, string> = {
 /** Long enough for a cold container, short enough to not hang the indicator. */
 const TIMEOUT_MS = 75_000;
 
-export function ApiStatus({ className }: { className?: string }) {
+export function ApiStatus({
+  className,
+  coldStartHint = false,
+}: {
+  className?: string;
+  /**
+   * Explain the wait while checking. True on the sign-in screen, where a
+   * visitor is meeting a sleeping free-tier backend and has no way to know
+   * that; false inside the application, where they are already signed in and
+   * the container is by definition awake.
+   */
+  coldStartHint?: boolean;
+}) {
   const [state, setState] = useState<Reachability>("checking");
 
   useEffect(() => {
@@ -79,7 +91,7 @@ export function ApiStatus({ className }: { className?: string }) {
         )}
       />
       <span className="text-[12px] text-content-tertiary">{LABEL[state]}</span>
-      {state === "checking" && (
+      {coldStartHint && state === "checking" && (
         <span className="text-[12px] text-content-disabled">· free tier, wakes in ~1 min</span>
       )}
     </div>

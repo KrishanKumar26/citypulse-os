@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ApiStatus } from "@/components/auth/ApiStatus";
+import { ApiStatus } from "@/components/system/ApiStatus";
 
 /**
  * What the visitor is signing into, shown beside the form.
@@ -142,10 +142,10 @@ export function BrandPanel() {
           </dl>
 
           <div className="mt-6 border-t border-line-subtle pt-5">
-            <ApiStatus />
+            <ApiStatus coldStartHint />
           </div>
 
-          <p className="mt-3 text-[11.5px] leading-relaxed text-content-disabled">
+          <p className="mt-3 text-[11px] leading-relaxed text-content-disabled">
             Demonstration environment. Traffic, weather and incidents are
             synthetic and labelled as such; air quality is real and credited on
             the Data Sources screen.

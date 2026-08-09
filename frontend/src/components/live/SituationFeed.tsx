@@ -251,19 +251,19 @@ function SituationRow({
           <button
             type="button"
             onClick={() => onInvestigate(anomaly.zoneId)}
-            className="rounded-md border border-accent/40 bg-accent-subtle px-2.5 py-1 text-[11.5px] font-medium text-accent transition-colors hover:bg-accent-muted"
+            className="rounded-md border border-accent/40 bg-accent-subtle px-2.5 py-1 text-[11px] font-medium text-accent transition-colors hover:bg-accent-muted"
           >
             Investigate
           </button>
           <Link
             href="/forecast"
-            className="rounded-md border border-line-default px-2.5 py-1 text-[11.5px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
+            className="rounded-md border border-line-default px-2.5 py-1 text-[11px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
           >
             Forecast
           </Link>
           <Link
             href="/simulator"
-            className="rounded-md border border-line-default px-2.5 py-1 text-[11.5px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
+            className="rounded-md border border-line-default px-2.5 py-1 text-[11px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"
           >
             Simulate
           </Link>
@@ -304,7 +304,7 @@ function SituationRow({
         </Fact>
       </dl>
 
-      <p className="mt-2.5 text-[10.5px] text-content-tertiary">
+      <p className="mt-2.5 text-[10px] text-content-tertiary">
         Detected {new Date(anomaly.detectedAt).toLocaleTimeString()} · baseline from{" "}
         {anomaly.baselineSamples} historical windows · {Number(anomaly.deviationScore).toFixed(1)}{" "}
         scaled MADs from normal

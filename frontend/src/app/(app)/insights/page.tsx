@@ -237,7 +237,7 @@ function Delta({
   return (
     <div className="bg-surface-raised px-3 py-2.5">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[10.5px] text-content-tertiary">{label}</span>
+        <span className="text-[10px] text-content-tertiary">{label}</span>
         <span
           className={cn(
             "tabular text-[15px] font-medium leading-none",

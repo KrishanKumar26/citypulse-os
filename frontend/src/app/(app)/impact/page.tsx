@@ -99,7 +99,7 @@ export default function ImpactPage() {
         </div>
       )}
 
-      <p className="text-[11.5px] leading-relaxed text-content-tertiary">
+      <p className="text-[11px] leading-relaxed text-content-tertiary">
         These are measured coincidences between a stated action and a departure from normal.
         Nothing here establishes that the action caused the change: the platform compares what
         followed against what this zone usually does at these hours, and reports the difference.
@@ -130,7 +130,7 @@ function InterventionCard({ intervention }: { intervention: Intervention }) {
         }
       />
 
-      <div className="px-5 py-3 text-[11.5px] text-content-tertiary">
+      <div className="px-5 py-3 text-[11px] text-content-tertiary">
         Started {new Date(intervention.startedAt).toLocaleString()}
         {intervention.endedAt && <> · ended {new Date(intervention.endedAt).toLocaleString()}</>}
         {" · compared over "}
@@ -147,7 +147,7 @@ function ImpactPanel({ impact }: { impact: Impact | null }) {
     // A city-wide action has no zone baseline. Inventing a city-level normal
     // that was never learned would be worse than saying nothing.
     return (
-      <p className="border-t border-line-subtle px-5 py-4 text-[12.5px] text-content-tertiary">
+      <p className="border-t border-line-subtle px-5 py-4 text-[12px] text-content-tertiary">
         No impact is measured for a city-wide action — there is no zone baseline to compare it
         against, and the platform never learned a city-level one.
       </p>
@@ -159,7 +159,7 @@ function ImpactPanel({ impact }: { impact: Impact | null }) {
     // during an outage would otherwise score however the gap averaged.
     return (
       <div className="border-t border-line-subtle px-5 py-4">
-        <p className="text-[12.5px] text-content-secondary">
+        <p className="text-[12px] text-content-secondary">
           {impact.unmeasurableReason}
         </p>
         <p className="mt-1 text-[11px] text-content-tertiary">
@@ -173,7 +173,7 @@ function ImpactPanel({ impact }: { impact: Impact | null }) {
   return (
     <div className="border-t border-line-subtle">
       {impact.provisional && (
-        <p className="border-b border-line-subtle bg-surface-overlay px-5 py-2 text-[11.5px] text-content-secondary">
+        <p className="border-b border-line-subtle bg-surface-overlay px-5 py-2 text-[11px] text-content-secondary">
           Still in effect — the window after it is still filling, so these figures will move.
         </p>
       )}
@@ -184,7 +184,7 @@ function ImpactPanel({ impact }: { impact: Impact | null }) {
         ))}
       </div>
 
-      <p className="px-5 py-3 text-[10.5px] text-content-tertiary">
+      <p className="px-5 py-3 text-[10px] text-content-tertiary">
         {impact.windowsBefore} curated windows before, {impact.windowsAfter} after.
       </p>
     </div>
@@ -226,7 +226,7 @@ function MetricPanel({ metric }: { metric: MetricImpact }) {
               {excess > 0 ? "+" : ""}
               {excess.toFixed(1)}%
             </span>
-            <span className="text-[10.5px] text-content-tertiary">beyond normal</span>
+            <span className="text-[10px] text-content-tertiary">beyond normal</span>
           </>
         )}
       </div>
