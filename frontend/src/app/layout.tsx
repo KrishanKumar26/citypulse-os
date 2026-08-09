@@ -19,6 +19,26 @@ export const metadata: Metadata = {
     + "intelligence layer: observe, predict, simulate and act on city conditions.",
   applicationName: "CityPulse OS",
   robots: { index: true, follow: true },
+
+  // Without these, the link pasted into a message renders as a bare URL. The
+  // card image is generated at opengraph-image.tsx rather than committed as a
+  // binary, so it cannot drift from the wording above it.
+  openGraph: {
+    type: "website",
+    siteName: "CityPulse OS",
+    locale: "en_GB",
+    title: "CityPulse OS — Urban Intelligence Platform",
+    description:
+      "Traffic, weather, air quality, events and incidents correlated into one "
+      + "intelligence layer: observe, predict, simulate and act.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CityPulse OS — Urban Intelligence Platform",
+    description:
+      "Traffic, weather, air quality, events and incidents correlated into one "
+      + "intelligence layer: observe, predict, simulate and act.",
+  },
 };
 
 export const viewport: Viewport = {

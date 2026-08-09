@@ -2,10 +2,12 @@ import Link from "next/link";
 
 import { API_BASE_URL } from "@/lib/api/client";
 
+import { CapabilityGlyph } from "@/components/marketing/CapabilityGlyph";
 import { CountUp } from "@/components/marketing/CountUp";
 import { Reveal } from "@/components/marketing/Reveal";
 import { PipelineDiagram } from "@/components/marketing/PipelineDiagram";
-import { SignalFlow } from "@/components/marketing/SignalFlow";
+import { ProcessLoop } from "@/components/marketing/ProcessLoop";
+import { CityIntelligence } from "@/components/marketing/CityIntelligence";
 
 /**
  * Landing page (PRD §6.1).
@@ -83,7 +85,7 @@ function Hero() {
       {/* Copy and diagram side by side from lg. Below that the diagram follows
           the buttons rather than splitting the sentence from its call to
           action — it restates the paragraph, so it can wait. */}
-      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-20 md:py-28 lg:grid-cols-[1.15fr_minmax(0,27rem)] lg:items-center lg:gap-16">
+      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-20 md:py-28 lg:grid-cols-[1fr_minmax(0,32rem)] lg:items-center lg:gap-16">
         <div>
         <div className="inline-flex items-center gap-2 rounded-full border border-line-default bg-surface-raised px-3 py-1 text-[12px] text-content-secondary">
           <span className="h-1.5 w-1.5 rounded-full bg-status-normal pulse-dot" aria-hidden="true" />
@@ -91,42 +93,45 @@ function Hero() {
         </div>
 
         <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-[1.1] tracking-tight md:text-[3.25rem] lg:text-[2.75rem] xl:text-[3.1rem]">
-          Do not build a dashboard that shows data.
-          <span className="block text-content-tertiary">
-            Build an intelligence layer that understands it.
-          </span>
+          An intelligence layer for
+          <span className="block text-content-tertiary">understanding the city.</span>
         </h1>
 
         <p className="mt-6 max-w-2xl text-[15px] leading-relaxed text-content-secondary">
-          Rain, a Friday evening, a stadium event and peak office hours are not four unrelated data
-          points. CityPulse OS correlates traffic, weather, air quality, events and incidents into a
-          single view of what is happening, why, and what is likely to happen next.
+          Traffic, weather, air quality, incidents and events arrive as five
+          separate feeds. CityPulse OS correlates them per zone and per window
+          into one account of what is happening, what follows from it, and what
+          a change would do — with every figure carrying where it came from.
         </p>
 
         <div className="mt-9 flex flex-wrap items-center gap-3">
           <Link
-            href="/signup"
+            href="/command-center"
             className="inline-flex h-11 items-center rounded-md bg-accent px-6 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
           >
-            Create an account
+            Open Command Centre
           </Link>
-          <Link
-            href="/login"
+          <a
+            href="#architecture"
             className="inline-flex h-11 items-center rounded-md border border-line-default bg-surface-overlay px-6 text-sm font-medium transition-colors hover:border-line-strong hover:bg-surface-hover"
           >
-            Sign in
-          </Link>
+            Explore architecture
+          </a>
         </div>
 
+        {/* Says what the primary action does before it is taken. The Command
+            Centre is behind authentication, so a visitor without an account
+            lands on the sign-in form — better read here than discovered there. */}
         <p className="mt-4 text-[13px] text-content-tertiary">
-          Accounts are created with read-only access. City telemetry in this environment is
-          synthetic and labelled as demo data throughout the product.
+          The Command Centre asks you to sign in; accounts are free and read-only.
+          Air quality is real. Traffic, weather and incidents are synthetic and
+          labelled as such throughout the product.
         </p>
 
         </div>
 
         <Reveal className="lg:pl-4">
-          <SignalFlow />
+          <CityIntelligence />
         </Reveal>
       </div>
 
@@ -165,7 +170,7 @@ function ProblemSection() {
         </h2>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <div className="rounded-lg border border-line-subtle bg-surface-raised p-6">
+          <Reveal className="rounded-lg border border-line-subtle bg-surface-raised p-6">
             <h3 className="text-sm font-medium text-content-secondary">Analysed independently</h3>
             <div className="mt-4 space-y-2.5">
               {[
@@ -182,9 +187,9 @@ function ProblemSection() {
             <p className="mt-4 text-[13px] text-content-tertiary">
               Four separate readings. Four separate dashboards. No conclusion.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="rounded-lg border border-accent/25 bg-accent-subtle p-6">
+          <Reveal delay={120} className="rounded-lg border border-accent/25 bg-accent-subtle p-6">
             <h3 className="text-sm font-medium text-accent">Correlated</h3>
             <div className="mt-4 rounded border border-line-default bg-surface-overlay p-4">
               <div className="text-[13px] text-content-tertiary">Assessment</div>
@@ -209,7 +214,7 @@ function ProblemSection() {
               correlation engine is live — measured correlations, with
               impliesCausation false in every payload.
             </p>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>
@@ -234,13 +239,21 @@ function HowItWorks() {
           A closed loop, not a reporting layer.
         </h2>
 
-        <div className="mt-10 grid gap-px overflow-hidden rounded-lg border border-line-subtle bg-line-subtle md:grid-cols-3">
-          {steps.map((item) => (
-            <div key={item.step} className="bg-surface-raised p-6">
+        <Reveal className="mt-10 overflow-x-auto rounded-lg border border-line-subtle bg-surface-raised p-6">
+          <div className="min-w-[44rem]">
+            <ProcessLoop />
+          </div>
+        </Reveal>
+
+        <div className="mt-4 grid gap-px overflow-hidden rounded-lg border border-line-subtle bg-line-subtle md:grid-cols-3">
+          {steps.map((item, index) => (
+            // Staggered in reading order. Six cards arriving together is a
+            // wall; arriving in sequence is the order they happen in.
+            <Reveal key={item.step} className="bg-surface-raised p-6" delay={index * 70}>
               <div className="font-mono text-[12px] text-accent">{item.step}</div>
               <h3 className="mt-2 text-[15px] font-medium">{item.title}</h3>
               <p className="mt-2 text-[13px] leading-relaxed text-content-tertiary">{item.body}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -253,18 +266,18 @@ function Capabilities() {
   // evaluator has two minutes (PRD §42) and needs to know what they can open
   // right now — a phase number answers a different question.
   const capabilities = [
-    { title: "Live Intelligence", body: "Zone conditions streamed over server-sent events: traffic state, speed, air quality and composite risk, each citing the curated window it came from.", state: "Live" },
-    { title: "Forecast Engine", body: "Congestion, speed, volume and risk across 15 minutes to 6 hours. Confidence is computed from the model's error on held-out data, not asserted.", state: "Live" },
-    { title: "What-If Simulator", body: "Weather, events, closures and volume changes run against real observed conditions, with the engine's assumptions documented and unit tested.", state: "Live" },
-    { title: "Anomaly Detection", body: "Departures from what each zone normally does at this hour of the week — a learned baseline, not a fixed threshold.", state: "Live" },
-    { title: "City Memory", body: "Past situations and what actually followed them. When too few comparable situations exist, it says so rather than guessing.", state: "Live" },
+    { title: "Live Intelligence", glyph: "live" as const, body: "Zone conditions streamed over server-sent events: traffic state, speed, air quality and composite risk, each citing the curated window it came from.", state: "Live" },
+    { title: "Forecast Engine", glyph: "forecast" as const, body: "Congestion, speed, volume and risk across 15 minutes to 6 hours. Confidence is computed from the model's error on held-out data, not asserted.", state: "Live" },
+    { title: "What-If Simulator", glyph: "simulation" as const, body: "Weather, events, closures and volume changes run against real observed conditions, with the engine's assumptions documented and unit tested.", state: "Live" },
+    { title: "Anomaly Detection", glyph: "anomaly" as const, body: "Departures from what each zone normally does at this hour of the week — a learned baseline, not a fixed threshold.", state: "Live" },
+    { title: "City Memory", glyph: "memory" as const, body: "Past situations and what actually followed them. When too few comparable situations exist, it says so rather than guessing.", state: "Live" },
     // Live, and the sentence is narrower than it was. The card claimed
     // "rate limiting for third-party access" and marked the whole thing
     // Planned, which was wrong in both directions: keys and the OpenAPI
     // document have shipped, and the rate limiter covers /api/v1/auth only —
     // it slows credential stuffing, not a key holder's traffic. Saying so is
     // cheaper than a reader discovering it against production.
-    { title: "API Platform", body: "Documented OpenAPI surface and scoped API keys, authenticated on their own header and frozen to the permissions held when issued. Per-key rate limiting is not built; the limiter that exists guards the authentication endpoints.", state: "Live" },
+    { title: "API Platform", glyph: "api" as const, body: "Documented OpenAPI surface and scoped API keys, authenticated on their own header and frozen to the permissions held when issued. Per-key rate limiting is not built; the limiter that exists guards the authentication endpoints.", state: "Live" },
   ];
 
   return (
@@ -280,8 +293,12 @@ function Capabilities() {
         </p>
 
         <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {capabilities.map((capability) => (
-            <div key={capability.title} className="rounded-lg border border-line-subtle bg-surface-raised p-5">
+          {capabilities.map((capability, index) => (
+            <Reveal
+              key={capability.title}
+              delay={index * 60}
+              className="group rounded-lg border border-line-subtle bg-surface-raised p-5 transition-colors duration-300 hover:border-line-default"
+            >
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-[15px] font-medium">{capability.title}</h3>
                 <span
@@ -295,7 +312,10 @@ function Capabilities() {
                 </span>
               </div>
               <p className="mt-2.5 text-[13px] leading-relaxed text-content-tertiary">{capability.body}</p>
-            </div>
+              <div className="mt-4 border-t border-line-subtle pt-3">
+                <CapabilityGlyph kind={capability.glyph} />
+              </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -458,14 +478,15 @@ function CallToAction() {
           Observe. Predict. Simulate. Act.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-[15px] text-content-secondary">
-          Create an account to explore the command centre with the seeded demo cities.
+          Ten Indian metros, sixty-two zones, fourteen modules. Air quality is
+          real; everything else is generated and says so.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link
-            href="/signup"
+            href="/command-center"
             className="inline-flex h-11 items-center rounded-md bg-accent px-6 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
           >
-            Create an account
+            Open Command Centre
           </Link>
           <a
             href={`${API_BASE_URL}/swagger-ui.html`}
@@ -484,15 +505,50 @@ function CallToAction() {
 function SiteFooter() {
   return (
     <footer>
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2.5">
-          <Logo />
-          <span className="text-[13px] text-content-tertiary">
-            CityPulse OS — Observe. Predict. Simulate. Act.
-          </span>
+      <div className="mx-auto max-w-6xl px-6 py-10">
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="flex items-center gap-2.5">
+            <Logo />
+            <span className="text-[13px] text-content-tertiary">
+              CityPulse OS — Observe. Predict. Simulate. Act.
+            </span>
+          </div>
+
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
+            {[
+              { href: "#how-it-works", label: "How it works" },
+              { href: "#capabilities", label: "Capabilities" },
+              { href: "#architecture", label: "Architecture" },
+              { href: "#security", label: "Security" },
+              { href: "#roadmap", label: "Status" },
+            ].map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-content-tertiary transition-colors hover:text-content-primary"
+              >
+                {link.label}
+              </a>
+            ))}
+            <Link
+              href="/login"
+              className="text-content-tertiary transition-colors hover:text-content-primary"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/signup"
+              className="text-content-tertiary transition-colors hover:text-content-primary"
+            >
+              Create account
+            </Link>
+          </nav>
         </div>
-        <p className="text-[12px] text-content-disabled">
-          Demonstration environment. City telemetry is synthetic and labelled as demo data.
+
+        <p className="mt-8 border-t border-line-subtle pt-6 text-[12px] leading-relaxed text-content-disabled">
+          Demonstration environment. Traffic, weather, incidents and city events
+          are synthetic and labelled as demo data throughout the product. Air
+          quality is real and credited on the Data Sources screen.
         </p>
       </div>
     </footer>
