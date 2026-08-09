@@ -247,8 +247,16 @@ def main() -> int:
             """, rows)
 
             with connection.cursor() as cursor:
+                # Activated here rather than by a migration. V16 seeds this
+                # source PAUSED and says it "becomes ACTIVE when someone
+                # configures a key" — a delivery is the evidence that one is
+                # configured, and it is evidence this deployment produced. A
+                # migration would mark it ACTIVE everywhere, including forks with
+                # no key, where the Data Health page would then report a silent
+                # feed: a fault report for a deliberate state.
                 cursor.execute(
-                    "UPDATE data_sources SET last_ingested_at = now() WHERE id = %s", (source_id,))
+                    "UPDATE data_sources SET last_ingested_at = now(), status = 'ACTIVE' "
+                    "WHERE id = %s", (source_id,))
             connection.commit()
 
             # The curated windows covering these readings were built before the
