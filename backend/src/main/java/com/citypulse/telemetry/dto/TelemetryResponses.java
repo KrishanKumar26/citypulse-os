@@ -63,6 +63,13 @@ public final class TelemetryResponses {
             BigDecimal precipitationMmH,
             String weatherCondition,
 
+            @Schema(description = "Where this weather came from: MEASURED (an instrument), "
+                    + "MODELLED (a numerical weather model — the real atmosphere, solved for) "
+                    + "or SYNTHETIC (generated here). Null when the window has no weather "
+                    + "reading at all.",
+                    allowableValues = {"MEASURED", "MODELLED", "SYNTHETIC"})
+            String weatherSource,
+
             int activeIncidents,
             int activeEvents,
 

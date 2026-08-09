@@ -52,7 +52,7 @@ function renderTopbar(selected: City | null) {
 describe("Topbar", () => {
   it("labels synthetic data (PRD §42)", () => {
     renderTopbar(city());
-    expect(screen.getByText("DEMO DATA")).toBeInTheDocument();
+    expect(screen.getByText("PARTLY SYNTHETIC")).toBeInTheDocument();
   });
 
   it("labels it at every width", () => {
@@ -60,11 +60,11 @@ describe("Topbar", () => {
     // while two other badges existed on the page; with one, a phone would have
     // shown generated telemetry with nothing saying so.
     renderTopbar(city());
-    expect(screen.getByText("DEMO DATA").className).not.toMatch(/\bhidden\b/);
+    expect(screen.getByText("PARTLY SYNTHETIC").className).not.toMatch(/\bhidden\b/);
   });
 
   it("does not label a city serving real data", () => {
     renderTopbar(city({ demoData: false }));
-    expect(screen.queryByText("DEMO DATA")).not.toBeInTheDocument();
+    expect(screen.queryByText("PARTLY SYNTHETIC")).not.toBeInTheDocument();
   });
 });

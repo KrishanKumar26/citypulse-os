@@ -33,7 +33,7 @@ from common.validation import (  # noqa: E402
     validate,
 )
 from generator import catalog as catalog_module  # noqa: E402
-from pipeline import air_provenance, loader  # noqa: E402
+from pipeline import loader, provenance  # noqa: E402
 from pipeline.aggregate import DEFAULT_WINDOW, aggregate  # noqa: E402
 
 
@@ -164,7 +164,10 @@ def main(argv: list[str] | None = None) -> int:
         # overwrite a real AQI with the invented one for the same hour. The real
         # reading is still in the raw table, so it is re-applied rather than
         # lost — and the overlay is idempotent, so doing this every run is free.
-        transform_stats["real_air_windows"] = air_provenance.overlay(
+        transform_stats["real_air_windows"] = provenance.overlay(
+            connection, since=earliest
+        )
+        transform_stats["real_weather_windows"] = provenance.overlay_weather(
             connection, since=earliest
         )
 

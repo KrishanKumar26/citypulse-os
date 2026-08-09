@@ -50,7 +50,7 @@ from psycopg.rows import dict_row  # noqa: E402
 from ingest import air_store  # noqa: E402
 from ingest.air_store import haversine_km  # noqa: E402  (re-exported for tests)
 from ingest.cpcb_aqi import compute  # noqa: E402
-from pipeline.air_provenance import MEASURED, overlay  # noqa: E402
+from pipeline.provenance import MEASURED, overlay  # noqa: E402
 
 # The live CPCB resource on data.gov.in.
 RESOURCE_ID = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"

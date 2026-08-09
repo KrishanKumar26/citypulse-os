@@ -64,7 +64,7 @@ from psycopg.rows import dict_row  # noqa: E402
 
 from ingest import air_store, us_aqi  # noqa: E402
 from ingest.cpcb_aqi import compute  # noqa: E402
-from pipeline.air_provenance import MEASURED, overlay  # noqa: E402
+from pipeline.provenance import MEASURED, overlay  # noqa: E402
 
 ENDPOINT = "https://api.waqi.info"
 

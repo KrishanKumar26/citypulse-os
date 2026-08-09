@@ -25,21 +25,21 @@ from common.transforms import (
 DEFAULT_WINDOW = timedelta(minutes=5)
 
 #: Best air first. Kept as a literal rather than imported from
-#: pipeline.air_provenance so this module stays pure — it is the one piece of
+#: pipeline.provenance so this module stays pure — it is the one piece of
 #: the pipeline both Spark and the local runner execute, and it must not pull in
 #: psycopg to fold a batch of dictionaries.
 PRECEDENCE = ("MEASURED", "MODELLED", "SYNTHETIC")
 
 
 def _provenance(event: dict) -> str:
-    """Where one air reading came from.
+    """Where one reading came from — air or weather, the rule is the same.
 
     An event may say so outright. One that does not is read from `demo_data`,
     which is the only thing the generator's own events carry: TRUE is this
     platform inventing a number, and FALSE — on this path — is the historical
     shape of a measured reading, from before a model was a third possibility.
     Real feeds do not travel this path at all; they are written straight to
-    `air_quality_events` and applied by `pipeline.air_provenance`, which reads
+    `air_quality_events` and applied by `pipeline.provenance`, which reads
     the provenance from the source rather than inferring it.
     """
     label = event.get("provenance")
@@ -213,6 +213,10 @@ def aggregate(
             "risk_level": risk_level(score),
             "sample_count": len(traffic_rows) + len(air_rows) + len(weather_rows),
             "aqi_source": aqi_source,
+            # Weather arrives per city and is attached to every zone in it, so
+            # its provenance is whatever the contributing readings carried —
+            # the same rule as the air, one field over.
+            "weather_source": _provenance(weather_rows[0]) if weather_rows else None,
             # A window is demo data unless every reading behind it was measured.
             # Written as a fact about the inputs rather than a constant: it was
             # hardcoded TRUE, which was correct only for as long as every feed

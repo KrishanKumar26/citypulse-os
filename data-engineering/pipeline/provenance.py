@@ -1,10 +1,14 @@
-"""Point curated windows at the best air available for them, and say which it is.
+"""Point curated windows at the best reading available, and say which it is.
 
 The generated feeds travel event → window → `zone_metrics` in one pass, because
 the aggregator sees them in the batch it is given. A real feed does not: WAQI
 and Open-Meteo are fetched on their own schedule and written straight to
-`air_quality_events`, so the curated windows covering them were already built,
-from generated readings, before the real ones arrived. Written to the raw table
+`air_quality_events` and `weather_events`, so the curated windows covering them
+were already built, from generated readings, before the real ones arrived.
+
+Two signals now, air and weather, and both follow the rules below. Traffic,
+incidents and city events have no real feed to overlay and are not handled
+here. Written to the raw table
 and left there, a real reading is something nothing reads — the dashboard reads
 `zone_metrics`.
 
@@ -147,6 +151,106 @@ def overlay(
                    risk_level   = %s,
                    aqi_source   = %s,
                    computed_at  = now()
+             WHERE zone_id = %s AND window_start = %s
+            """,
+            updates,
+        )
+    connection.commit()
+    return counts
+
+
+def overlay_weather(
+    connection: psycopg.Connection,
+    *,
+    since: datetime | None = None,
+    carry: timedelta = DEFAULT_CARRY,
+) -> dict[str, int]:
+    """The same rewrite for weather, joined through the city rather than the zone.
+
+    `weather_events.city_id`, not zone_id: a metro's zones share conditions
+    closely enough that a per-zone temperature would be false precision, and the
+    schema says so. So the covering reading is found for the zone's *city* and
+    applied to every zone in it — which is exactly what the aggregator does with
+    the generated feed.
+
+    No averaging inside a tier here, unlike the air. A city has one weather
+    reading at a moment; two would be the same provider answering twice.
+
+    Risk moves with the rain. `risk_score` weighs precipitation, so replacing it
+    without recomputing would leave a window whose displayed weather and
+    displayed risk disagree about whether it was raining.
+    """
+    floor = None if since is None else since - carry
+
+    with connection.cursor(row_factory=tuple_row) as cursor:
+        cursor.execute(
+            """
+            WITH real_weather AS (
+                SELECT we.city_id, we.event_time, we.temperature_c,
+                       we.precipitation_mm_h, we.condition, ds.provenance,
+                       CASE ds.provenance WHEN 'MEASURED' THEN 1 ELSE 2 END AS tier
+                  FROM weather_events we
+                  JOIN data_sources ds ON ds.id = we.source_id
+                 WHERE ds.provenance IN ('MEASURED', 'MODELLED')
+                   AND (%(floor)s::timestamptz IS NULL
+                        OR we.event_time >= %(floor)s::timestamptz)
+            )
+            SELECT zm.zone_id, zm.window_start,
+                   c.temperature_c, c.precipitation_mm_h, c.condition, c.provenance,
+                   zm.occupancy_ratio, zm.aqi, zm.active_incidents
+              FROM zone_metrics zm
+              JOIN zones z ON z.id = zm.zone_id
+              JOIN LATERAL (
+                  SELECT r.provenance, r.temperature_c, r.precipitation_mm_h,
+                         r.condition
+                    FROM real_weather r
+                   WHERE r.city_id = z.city_id
+                     AND r.event_time <  zm.window_end
+                     AND r.event_time >= zm.window_end - %(carry)s::interval
+                   ORDER BY r.tier, r.event_time DESC
+                   LIMIT 1
+              ) c ON TRUE
+             WHERE (%(since)s::timestamptz IS NULL
+                    OR zm.window_start >= %(since)s::timestamptz)
+               AND (zm.temperature_c      IS DISTINCT FROM c.temperature_c
+                 OR zm.precipitation_mm_h IS DISTINCT FROM c.precipitation_mm_h
+                 OR zm.weather_condition  IS DISTINCT FROM c.condition
+                 OR zm.weather_source     IS DISTINCT FROM c.provenance)
+            """,
+            {"floor": floor, "since": since, "carry": carry},
+        )
+        targets = cursor.fetchall()
+
+    if not targets:
+        return {}
+
+    counts: dict[str, int] = {}
+    updates = []
+    for (zone_id, window_start, temperature, precipitation, condition, provenance,
+         occupancy, aqi, incidents) in targets:
+        score = risk_score(
+            occupancy_ratio=float(occupancy) if occupancy is not None else None,
+            aqi=aqi,
+            active_incidents=incidents,
+            precipitation_mm_h=float(precipitation) if precipitation is not None else None,
+        )
+        counts[provenance] = counts.get(provenance, 0) + 1
+        updates.append((
+            temperature, precipitation, condition, provenance,
+            score, risk_level(score), zone_id, window_start,
+        ))
+
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            UPDATE zone_metrics
+               SET temperature_c      = %s,
+                   precipitation_mm_h = %s,
+                   weather_condition  = %s,
+                   weather_source     = %s,
+                   risk_score         = %s,
+                   risk_level         = %s,
+                   computed_at        = now()
              WHERE zone_id = %s AND window_start = %s
             """,
             updates,

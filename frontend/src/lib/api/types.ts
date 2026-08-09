@@ -178,6 +178,8 @@ export interface ZoneCondition {
   temperatureC: string | null;
   precipitationMmH: string | null;
   weatherCondition: string | null;
+  /** Where this weather came from. Null when the window has no reading. */
+  weatherSource: AirProvenance | null;
 
   activeIncidents: number;
   activeEvents: number;

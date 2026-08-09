@@ -20,7 +20,7 @@ import { ZONE_TYPE_LABELS } from "@/components/map/ZoneMap";
 import type { ConditionLevel, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
 import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
-import { describeAqi } from "@/lib/provenance";
+import { PROVENANCE_LABEL, describeAqi } from "@/lib/provenance";
 import { AqiValue } from "@/components/live/AqiValue";
 
 const ZoneMap = dynamic(() => import("@/components/map/ZoneMap"), {
@@ -208,7 +208,9 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
       [
         "Weather",
         condition.temperatureC
-          ? `${Number(condition.temperatureC).toFixed(1)}°C, ${condition.weatherCondition?.replace(/_/g, " ").toLowerCase() ?? "—"}`
+          ? `${Number(condition.temperatureC).toFixed(1)}°C, ${
+              condition.weatherCondition?.replace(/_/g, " ").toLowerCase() ?? "—"
+            }${condition.weatherSource ? ` · ${PROVENANCE_LABEL[condition.weatherSource]}` : ""}`
           : "Not measured",
       ],
     ]],

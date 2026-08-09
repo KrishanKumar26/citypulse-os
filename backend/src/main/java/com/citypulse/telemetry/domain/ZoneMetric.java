@@ -92,6 +92,15 @@ public class ZoneMetric {
     @Column(name = "precipitation_mm_h")
     private BigDecimal precipitationMmH;
 
+    /**
+     * Where this window's weather came from: {@code MEASURED} (an instrument),
+     * {@code MODELLED} (a numerical weather model) or {@code SYNTHETIC}
+     * (generated). Null when the window has no weather reading, which is not
+     * the same as a generated one.
+     */
+    @Column(name = "weather_source")
+    private String weatherSource;
+
     @Column(name = "weather_condition")
     private String weatherCondition;
 

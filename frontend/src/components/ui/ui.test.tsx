@@ -54,7 +54,18 @@ describe("Input", () => {
 describe("DemoDataBadge", () => {
   it("labels synthetic data, so it is never mistaken for live readings", () => {
     render(<DemoDataBadge />);
-    expect(screen.getByText("DEMO DATA")).toBeInTheDocument();
+    expect(screen.getByText("PARTLY SYNTHETIC")).toBeInTheDocument();
+  });
+
+  it("does not claim the whole city is generated", () => {
+    // It read DEMO DATA across every city, which was true until air quality
+    // became real. A blanket label over a real reading is the same failure as
+    // no label over a generated one, pointed the other way — and it buries the
+    // platform's strongest claim under a word that reads as "none of this
+    // counts".
+    render(<DemoDataBadge />);
+    expect(screen.queryByText(/DEMO DATA/)).not.toBeInTheDocument();
+    expect(screen.getByTitle(/Air quality and weather are real/)).toBeInTheDocument();
   });
 });
 

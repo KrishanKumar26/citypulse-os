@@ -54,7 +54,7 @@ from psycopg.rows import dict_row  # noqa: E402
 
 from ingest import air_store  # noqa: E402
 from ingest.cpcb_aqi import compute  # noqa: E402
-from pipeline.air_provenance import MEASURED, MODELLED, overlay  # noqa: E402
+from pipeline.provenance import MEASURED, MODELLED, overlay  # noqa: E402
 
 ENDPOINT = "https://air-quality-api.open-meteo.com/v1/air-quality"
 

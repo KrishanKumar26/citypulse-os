@@ -86,7 +86,8 @@ That sounds like a slogan; in practice it decided a great many things:
 - Simulated output is labelled as simulated, and the engine refuses to run
   without a real observed baseline — a before/after where the "before" was
   invented is worse than no answer.
-- Synthetic data is labelled as synthetic all the way to the browser.
+- Synthetic data is labelled as synthetic all the way to the browser, and the
+  label names which feeds rather than blanketing a city that has real ones.
 
 ### Air quality is where that principle got expensive
 
@@ -98,9 +99,21 @@ different kinds, forced the labelling to get more honest than a boolean.
 | Provenance | Source | What it means |
 |---|---|---|
 | `MEASURED` | CPCB stations, via [WAQI](https://waqi.info/) | An instrument reported it, within 8 km of the zone centre |
-| `MODELLED` | Copernicus CAMS, via [Open-Meteo](https://open-meteo.com/) | The real atmosphere, solved for — no instrument stood in this zone |
+| `MODELLED` | Copernicus CAMS and the Open-Meteo forecast model | The real atmosphere, solved for — no instrument stood here |
 | `SYNTHETIC` | this repository | Generated. No real feed covers this zone and hour |
-| `null` | — | The window has no AQI at all, which is not the same as a generated one |
+| `null` | — | The window has no reading at all, which is not the same as a generated one |
+
+Two signals carry it. **Air quality** since the CPCB feed became reachable, and
+**weather** since the same provider turned out to serve it — temperature,
+humidity, precipitation, wind and visibility for every city centre, with the WMO
+code mapped onto this platform's own condition scale. The snow codes are
+deliberately unmapped: a scale built for Indian metros has no word for snow, and
+a reading that cannot be labelled is dropped rather than filed under whichever
+label looks closest.
+
+Traffic, incidents and city events stay generated. Not for want of trying —
+there is no free real-time feed for any of them in these cities, and the PRD
+requires the platform to run without one.
 
 Three rules hold it together:
 
