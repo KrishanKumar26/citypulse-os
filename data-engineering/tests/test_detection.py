@@ -217,3 +217,42 @@ class TestSustainedShift:
     def test_returns_none_without_enough_recent_history(self) -> None:
         # Distinct from finding nothing: persistence could not be judged.
         assert detect_sustained([140.0, 140.0], a_baseline()) is None
+
+
+class TestExplainIsSharedWithTheBackfill:
+    """One definition of the sentence, so two writers cannot drift apart.
+
+    The detector composes it when a window is judged; `intelligence.rephrase`
+    rebuilds it for rows written before the wording changed. Two copies would
+    diverge the first time either was edited, and the divergence would be
+    invisible — both would still read as sentences.
+    """
+
+    def test_the_detector_uses_the_shared_function(self) -> None:
+        from intelligence.detection import explain
+
+        baseline = a_baseline(median_value=8_000.0, mad=400.0, samples=54)
+        outcome = detect(17_800.0, baseline, metric_label="Vehicle volume")
+        assert isinstance(outcome, Detection)
+
+        rebuilt = explain(
+            label="Vehicle volume",
+            observed=17_800.0,
+            baseline_median=8_000.0,
+            samples=54,
+            direction="above",
+            percent_change=outcome.percent_change,
+        )
+        assert outcome.explanation == rebuilt
+
+    def test_states_the_evidence_without_the_statistics(self) -> None:
+        from intelligence.detection import explain
+
+        sentence = explain(
+            label="Average speed", observed=7.13, baseline_median=43.23,
+            samples=12, direction="below", percent_change=-84.0,
+        )
+        assert "7.13" in sentence and "43.23" in sentence and "12" in sentence
+        assert "-84%" in sentence
+        assert "standard deviation" not in sentence.lower()
+        assert "mad" not in sentence.lower().split()

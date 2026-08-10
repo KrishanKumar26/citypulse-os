@@ -195,6 +195,42 @@ def _severity(score: float) -> Severity:
     return Severity.LOW
 
 
+
+def explain(
+    *,
+    label: str,
+    observed: float,
+    baseline_median: float,
+    samples: int,
+    direction: str,
+    percent_change: float | None,
+) -> str:
+    """The sentence shown on the Command Center for one detection.
+
+    Its own function because two callers need to produce it identically: the
+    detector, when it judges a window, and `intelligence.rephrase`, which
+    rebuilds the sentence for rows written before the wording changed. Two
+    copies of this string would drift the first time either was edited, and the
+    drift would be invisible — both would still read as sentences.
+
+    It said "20.0 standard deviations below the normal 43.23", which is exactly
+    right and asks the person deciding whether to send someone to hold a
+    statistics lesson first. The deviation score is still on the record and the
+    screens still show it, with its definition; it is no longer the prose.
+
+    Nothing here is inferred. Every value is one the detection already
+    established, which is what makes rebuilding an old row honest rather than a
+    rewrite of history.
+    """
+    change = f" ({percent_change:+.0f}%)" if percent_change is not None else ""
+    return (
+        f"{label} is {observed:,.2f}{change}. This zone is usually around "
+        f"{baseline_median:,.2f} at this time of day, so it is well "
+        f"{direction} normal — far enough out that it is unlikely to be "
+        f"ordinary variation. Compared against {samples} past readings for "
+        f"this zone at this hour."
+    )
+
 def detect(
     observed: float,
     baseline: Baseline,
@@ -252,27 +288,26 @@ def detect(
 
     kind = AnomalyType.SPIKE if observed > baseline.median else AnomalyType.DROP
     direction = "above" if kind is AnomalyType.SPIKE else "below"
-    change = (
-        f" ({percent_change:+.0f}%)" if percent_change is not None else ""
-    )
+    # Round once, then use that everywhere. The sentence was formatted from the
+    # raw value and the record stored the rounded one, so a change landing on a
+    # half — 122.5 — was written as "+123%" in the prose and 122.5 on the row.
+    # One is displayed and the other is what a rebuild or an export would use,
+    # and they disagreed by a whole percent.
+    stored_change = None if percent_change is None else round(percent_change, 2)
 
     return Detection(
         is_anomaly=True,
         deviation_score=round(deviation, 4),
         anomaly_type=kind,
         severity=_severity(deviation),
-        percent_change=None if percent_change is None else round(percent_change, 2),
-        # Plain words, same claim. This string is read on the Command Center by
-        # whoever is deciding whether to act, and "20.0 standard deviations
-        # below the normal 43.23" asks them to hold a statistics lesson first.
-        # The deviation score is still carried on the record, and the screens
-        # show it with its exact definition — it is just no longer the sentence.
-        explanation=(
-            f"{label} is {observed:,.2f}{change}. This zone is usually around "
-            f"{baseline.median:,.2f} at this time of day, so it is well "
-            f"{direction} normal — far enough out that it is unlikely to be "
-            f"ordinary variation. Compared against {baseline.sample_count} "
-            f"past readings for this zone at this hour."
+        percent_change=stored_change,
+        explanation=explain(
+            label=label,
+            observed=observed,
+            baseline_median=baseline.median,
+            samples=baseline.sample_count,
+            direction=direction,
+            percent_change=stored_change,
         ),
     )
 
