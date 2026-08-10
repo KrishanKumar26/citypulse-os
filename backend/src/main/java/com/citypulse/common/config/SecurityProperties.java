@@ -69,7 +69,24 @@ public record SecurityProperties(
      */
     public record Lockout(
             @Min(1) int maxFailedAttempts,
-            @NotNull Duration duration
+            @NotNull Duration duration,
+
+            /**
+             * The floor every rejected sign-in is held to, whoever it was for.
+             *
+             * A known address costs an extra read, an extra write and an extra
+             * committed transaction, because the failure has to be counted
+             * towards the lockout above; an unknown one has nothing to count.
+             * Measured against production, that made a registered address
+             * answer a second slower than an unregistered one, four times out
+             * of four — enough to sort a list of addresses without ever
+             * guessing a password.
+             *
+             * Must sit above the slower path or it pads nothing. Raising it
+             * costs every failed attempt that much wall clock and holds a
+             * request thread for it.
+             */
+            @NotNull Duration minFailedResponse
     ) {
     }
 

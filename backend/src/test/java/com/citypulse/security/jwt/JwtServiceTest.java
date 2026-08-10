@@ -106,7 +106,7 @@ class JwtServiceTest {
         var otherIssuer = new JwtService(new SecurityProperties(
                 new SecurityProperties.Jwt(SECRET, "someone-else", Duration.ofMinutes(15)),
                 new SecurityProperties.Refresh(Duration.ofDays(7), 5),
-                new SecurityProperties.Lockout(5, Duration.ofMinutes(15)),
+                new SecurityProperties.Lockout(5, Duration.ofMinutes(15), Duration.ofMillis(1)),
                 new SecurityProperties.RateLimit(10, false),
                 new SecurityProperties.PasswordReset(Duration.ofMinutes(30)),
                 new SecurityProperties.Signup(false, Duration.ofHours(24)),
@@ -158,7 +158,7 @@ class JwtServiceTest {
         return new SecurityProperties(
                 new SecurityProperties.Jwt(secret, ISSUER, accessTtl),
                 new SecurityProperties.Refresh(Duration.ofDays(7), 5),
-                new SecurityProperties.Lockout(5, Duration.ofMinutes(15)),
+                new SecurityProperties.Lockout(5, Duration.ofMinutes(15), Duration.ofMillis(1)),
                 new SecurityProperties.RateLimit(10, false),
                 new SecurityProperties.PasswordReset(Duration.ofMinutes(30)),
                 new SecurityProperties.Signup(false, Duration.ofHours(24)),

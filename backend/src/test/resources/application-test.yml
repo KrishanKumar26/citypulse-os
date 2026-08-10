@@ -68,6 +68,10 @@ citypulse:
     lockout:
       max-failed-attempts: 5
       duration: PT15M
+      # Effectively off under test. The floor exists to flatten a timing
+      # difference against a remote attacker; paying it on every rejected-login
+      # assertion would add real seconds to the suite and prove nothing.
+      min-failed-response: PT0.001S
     rate-limit:
       # Off by default: the per-IP limit would otherwise reject legitimate test
       # traffic. RateLimitIT enables it explicitly for its own assertions.

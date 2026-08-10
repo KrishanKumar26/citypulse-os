@@ -199,12 +199,43 @@ public class AuthService {
             throw new Exceptions.AccountUnavailable("This account has been suspended. Contact an administrator.");
         }
 
+        // The plaintext has just been proven correct and is still in hand — the
+        // one moment a stored hash can be moved to the current cost factor.
+        upgradeHashIfStale(user, request.password());
+
         loginAttemptService.registerSuccess(user);
         auditService.recordSuccess(AuditAction.LOGIN_SUCCESS, user.getId(), user.getEmail(), null);
 
         // A fresh login starts a new token family, so revoking one compromised
         // session does not sign the user out everywhere.
         return issueSession(user, UUID.randomUUID(), httpRequest);
+    }
+
+
+    /**
+     * The cost factor prefix the encoder currently writes.
+     *
+     * A bcrypt string carries its own cost, so a hash made at 12 keeps verifying
+     * at 12 no matter what the encoder is configured to produce. Without a
+     * re-hash, lowering the strength would speed up new accounts only and leave
+     * every existing user on the old, slower path forever.
+     */
+    private static final String CURRENT_HASH_PREFIX = "$2a$10$";
+
+    /**
+     * Moves a password to the current cost factor, once, on a successful login.
+     *
+     * Costs one extra hash on the first sign-in after a strength change and
+     * nothing on any sign-in after that. A hash whose prefix is not recognised
+     * is left alone rather than re-hashed on every login forever.
+     */
+    private void upgradeHashIfStale(User user, String provenPassword) {
+        String current = user.getPasswordHash();
+        if (current != null && current.startsWith(CURRENT_HASH_PREFIX)) {
+            return;
+        }
+        user.setPasswordHash(passwordEncoder.encode(provenPassword));
+        userRepository.save(user);
     }
 
     // ---------------------------------------------------------------------

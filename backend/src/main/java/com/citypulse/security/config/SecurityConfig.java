@@ -34,11 +34,27 @@ import java.util.List;
 public class SecurityConfig {
 
     /**
-     * Cost 12: roughly 250 ms per hash on current hardware. High enough to make
-     * offline cracking expensive, low enough that login latency stays acceptable
-     * and the endpoint is not itself a denial-of-service vector.
+     * Cost 10, lowered from 12 after measuring it on the hardware this actually
+     * runs on.
+     *
+     * The old comment said "roughly 250 ms per hash on current hardware", which
+     * was true of a developer laptop and not of the deployment. Render's free
+     * tier allocates 0.1 CPU, and BCrypt is pure CPU work — nothing about it
+     * touches the database. Measured against production: a plain read returns in
+     * 0.18 s and a sign-in took 3.7 s, warm, every time. Twenty times slower than
+     * any other request in the product, on the first thing anybody does.
+     *
+     * Each step down halves the work, so 10 is a quarter of 12: about 0.9 s here.
+     * That is above OWASP's floor of 10 for bcrypt, and the practical protection
+     * against online guessing is the rate limiter and the lockout, both of which
+     * are already in place — cost factor only raises the price of cracking a
+     * database someone has already stolen.
+     *
+     * Existing hashes carry their own cost in the string, so they keep verifying
+     * at 12 until {@code AuthService} re-hashes them on the next successful
+     * sign-in.
      */
-    private static final int BCRYPT_STRENGTH = 12;
+    private static final int BCRYPT_STRENGTH = 10;
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/v1/auth/signup",

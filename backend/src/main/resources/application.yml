@@ -165,6 +165,9 @@ citypulse:
     lockout:
       max-failed-attempts: 5
       duration: PT15M
+      # Above the slower of the two rejection paths, or it pads nothing. Set
+      # from measurement after lowering the bcrypt cost, not from taste.
+      min-failed-response: PT1.6S
     rate-limit:
       enabled: true
       auth-requests-per-minute: 10
