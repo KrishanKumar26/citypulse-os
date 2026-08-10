@@ -5,6 +5,7 @@ import { ApiStatus } from "@/components/system/ApiStatus";
 import { Badge, Button, DemoDataBadge } from "@/components/ui";
 import type { City, PlatformInfo } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 /**
  * Top navigation (PRD §8): city selector, system status, notifications, profile.
@@ -88,6 +89,8 @@ export function Topbar({
           v{platform.version}
         </Badge>
       )}
+
+      <ThemeToggle className="mr-1" />
 
       <div className="relative" ref={menuRef}>
         <button

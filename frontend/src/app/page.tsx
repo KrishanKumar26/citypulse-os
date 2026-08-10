@@ -3,6 +3,7 @@ import Link from "next/link";
 import { API_BASE_URL } from "@/lib/api/client";
 
 import { CapabilityGlyph } from "@/components/marketing/CapabilityGlyph";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { DATA_DISCLOSURE } from "@/lib/wording";
 import { CountUp } from "@/components/marketing/CountUp";
 import { Reveal } from "@/components/marketing/Reveal";
@@ -53,6 +54,7 @@ function SiteHeader() {
           <a href="#roadmap" className="transition-colors hover:text-content-primary">Roadmap</a>
         </nav>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Link
             href="/login"
             className="rounded-md px-3 py-1.5 text-[13px] text-content-secondary transition-colors hover:bg-surface-hover hover:text-content-primary"

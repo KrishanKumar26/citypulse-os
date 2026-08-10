@@ -26,6 +26,16 @@ function tokenValue(name: string): string {
   return match[1].toLowerCase();
 }
 
+/** The same token as redefined by the light theme block. */
+function lightTokenValue(name: string): string {
+  const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
+  const block = css.split('html[data-theme="light"] {')[1];
+  if (!block) throw new Error("the light theme block is missing from globals.css");
+  const match = block.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,8})`));
+  if (!match) throw new Error(`token ${name} is not overridden for the light theme`);
+  return match[1].toLowerCase();
+}
+
 function mapFallback(level: string): string {
   const src = readFileSync(join(ROOT, "components", "map", "ZoneMap.tsx"), "utf8");
   const block = src.match(/FALLBACK_CONDITION_COLORS[^{]*\{([^}]*)\}/);
@@ -56,13 +66,33 @@ describe("severity colours", () => {
 });
 
 describe("theme-color", () => {
-  it("matches the base surface", () => {
+  it("matches the base surface in both themes", () => {
     // The browser paints its chrome with this before any CSS loads, so it is a
     // literal rather than a token — and therefore the one value that can fall
     // out of step with the palette without anything looking broken in the app.
+    // It is now one entry per scheme: a single value left the phone's status
+    // bar in the dark theme's near-black above a white page, which is the one
+    // surface the toggle cannot reach because the OS paints it.
     const layout = readFileSync(join(ROOT, "app", "layout.tsx"), "utf8");
-    const declared = layout.match(/themeColor:\s*"(#[0-9a-fA-F]{3,8})"/);
-    expect(declared).not.toBeNull();
-    expect(declared![1].toLowerCase()).toBe(tokenValue("--color-surface-base"));
+    const declared = [...layout.matchAll(/color:\s*"(#[0-9a-fA-F]{3,8})"/g)]
+      .map((m) => m[1].toLowerCase());
+
+    expect(declared).toContain(tokenValue("--color-surface-base"));
+    expect(declared).toContain(lightTokenValue("--color-surface-base"));
+  });
+});
+
+describe("the light theme", () => {
+  it("redefines every colour token the dark theme declares", () => {
+    // A token left out does not fail: it keeps its dark value and appears as
+    // one dark element in a light page — a black card, an unreadable label —
+    // which is the failure mode of every half-finished theme.
+    const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
+    const [dark, light] = css.split('html[data-theme="light"] {');
+    const declared = (source: string) =>
+      new Set([...source.matchAll(/(--color-[a-z-]+):/g)].map((m) => m[1]));
+
+    const missing = [...declared(dark)].filter((token) => !declared(light).has(token));
+    expect(missing, `not overridden for light: ${missing.join(", ")}`).toEqual([]);
   });
 });

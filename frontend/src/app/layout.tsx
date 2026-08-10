@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -46,14 +47,34 @@ export const viewport: Viewport = {
   // token: the browser paints its chrome with it before any stylesheet loads.
   // It was left at the old near-black through the palette change, so the phone
   // status bar sat a shade off the page it framed — pinned by a test now.
-  themeColor: "#080b14",
+  // One per scheme. A single value left the phone's status bar in the dark
+  // theme's near-black while the page under it was white — the only part of
+  // the product the toggle could not reach, because it is painted by the OS.
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#080b14" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f8fc" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    // suppressHydrationWarning because the inline script below writes
+    // data-theme onto this element before React sees it. The server cannot know
+    // which theme the reader is in — that is the whole reason the script exists
+    // — so the attribute legitimately differs between the server's HTML and the
+    // client's first read, and without this React logs a mismatch on every load.
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <head>
+        {/*
+          Runs before the first paint, ahead of any stylesheet or markup.
+          Applying the theme in an effect instead would run after hydration,
+          which is after the browser has painted: a reader who chose light would
+          see the dark theme flash past on every navigation.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-screen antialiased">
         {/* Lets keyboard users bypass the sidebar and topbar (PRD §32). */}
         <a

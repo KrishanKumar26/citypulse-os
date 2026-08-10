@@ -39,6 +39,15 @@
   --shadow-raised: 0 2px 4px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.65);
   --shadow-drawer: -8px 0 32px -12px rgb(0 0 0 / 0.7);
 
+  /* The inset hairline along the top of a raised surface. White at 4% is what
+     lifts a card off a dark ground; on a light one it does nothing, so it is a
+     token rather than a literal in the utility. */
+  --edge-highlight: rgb(255 255 255 / 0.04);
+  /* How strongly the ambient washes behind the app read. Lower on light, where
+     the same percentage over white turns muddy rather than subtle. */
+  --wash-cool: 6%;
+  --wash-warm: 4%;
+
   /* Text — the ramp carries hierarchy, so most text is not pure white */
   --color-content-primary: #f1f5f9;
   --color-content-secondary: #a3b0c4;
@@ -141,8 +150,8 @@
     z-index: -1;
     pointer-events: none;
     background:
-      radial-gradient(60rem 40rem at 12% -10%, color-mix(in oklab, var(--color-accent) 6%, transparent), transparent 70%),
-      radial-gradient(48rem 36rem at 92% -6%, color-mix(in oklab, var(--color-ai) 4%, transparent), transparent 68%);
+      radial-gradient(60rem 40rem at 12% -10%, color-mix(in oklab, var(--color-accent) var(--wash-cool), transparent), transparent 70%),
+      radial-gradient(48rem 36rem at 92% -6%, color-mix(in oklab, var(--color-ai) var(--wash-warm), transparent), transparent 68%);
   }
 
   /* Visible focus is a requirement, not a preference (PRD §32 accessibility). */
@@ -288,7 +297,7 @@
  */
 @utility surface-raised-edge {
   box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.04),
+    inset 0 1px 0 0 var(--edge-highlight),
     var(--shadow-card);
 }
 
@@ -304,3 +313,112 @@
     linear-gradient(180deg, color-mix(in oklab, var(--color-surface-raised) 70%, transparent), transparent);
   border-bottom: 1px solid var(--color-line-subtle);
 }
+
+/*
+ * =============================================================================
+ * Light theme
+ * =============================================================================
+ *
+ * The dark values above are the defaults; this block overrides them. Every
+ * Tailwind utility compiles to `var(--color-…)` rather than a literal — checked
+ * in the built stylesheet, not assumed — so redefining the variable under a
+ * selector re-themes every component that has ever used the token, including
+ * ones written before this existed.
+ *
+ * `html[data-theme="light"]` rather than a media query, and the attribute is
+ * always present: the inline script in the document head resolves the system
+ * preference itself and writes an explicit value before first paint. One
+ * selector instead of a media query and an attribute rule that must be kept in
+ * agreement, and no flash of the wrong theme on load.
+ *
+ * **Chosen by measurement.** Every pair below was run through the same contrast
+ * and ΔE checks the dark palette was built with:
+ *
+ *   content-primary on the page ground   17.1 : 1
+ *   content-secondary                     7.2 : 1
+ *   content-tertiary                      5.1 : 1
+ *   accent on the ground                  5.0 : 1   (a control needs 3.0)
+ *   a button label on the accent          5.4 : 1   (needs 4.5)
+ *   every status colour on its own tint   4.8 – 5.4 : 1
+ *   adjacent severities, ΔE               34.5 – 62.3   (floor is 15)
+ *
+ * The accent is not the dark theme's cyan. #22d3ee on white measures 1.7 : 1 —
+ * the same failure the primary button had against white text, pointed the other
+ * way. It darkens to a deep cyan that holds 5 : 1 on the page and still reads
+ * as the same hue family.
+ *
+ * `content-disabled` measures 2.8 : 1 here, below the 4.5 body-text bar. That
+ * is not introduced by this block: the dark theme's is 2.6 : 1 on its own
+ * ground, and the token carries text a reader is meant to notice — "No
+ * reading", "Nothing suggested yet". Fixing it means moving both themes and
+ * changing every screen, which is a separate change from adding a toggle.
+ */
+html[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces — near-white with the same cool cast the dark theme carries, so
+     the two read as one product rather than two. Cards are pure white so they
+     lift off the page ground rather than needing a heavier border. */
+  --color-surface-base: #f6f8fc;
+  --color-surface-raised: #ffffff;
+  --color-surface-overlay: #f0f4fa;
+  --color-surface-hover: #e6ecf6;
+  --color-surface-inset: #eef2f9;
+
+  --color-line-subtle: #e3e9f2;
+  --color-line-default: #cbd5e3;
+  --color-line-strong: #94a3b8;
+
+  /* Depth comes from a soft shadow rather than a white inset hairline, which
+     is invisible on a light card. */
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 16px -6px rgb(15 23 42 / 0.10);
+  --shadow-raised: 0 2px 4px rgb(15 23 42 / 0.06), 0 12px 32px -12px rgb(15 23 42 / 0.14);
+  --shadow-drawer: -8px 0 32px -12px rgb(15 23 42 / 0.18);
+  --edge-highlight: transparent;
+
+  --wash-cool: 4%;
+  --wash-warm: 3%;
+
+  --color-content-primary: #0d1526;
+  --color-content-secondary: #44546c;
+  --color-content-tertiary: #5d6b83;
+  --color-content-disabled: #8a97ac;
+
+  --color-accent: #0e7490;
+  --color-accent-hover: #155e75;
+  --color-accent-muted: #cbeef6;
+  --color-accent-subtle: #eafaff;
+  --color-accent-mark: #0891b2;
+
+  --color-ai: #a21caf;
+  --color-ai-hover: #86198f;
+  --color-ai-muted: #f6d9fb;
+  --color-ai-subtle: #fdf2ff;
+
+  /* The status scale keeps its meaning and loses its brightness: the dark
+     theme's amber is unreadable on white, so each step moves to the darkest
+     value that still reads as the same colour. */
+  --color-status-normal: #047857;
+  --color-status-normal-bg: #e7f7f0;
+  --color-status-moderate: #8a6100;
+  --color-status-moderate-bg: #fdf6e3;
+  --color-status-high: #b8460c;
+  --color-status-high-bg: #fdefe6;
+  --color-status-critical: #be123c;
+  --color-status-critical-bg: #fdeaee;
+
+  --color-info: #0369a1;
+  --color-info-bg: #e8f4fd;
+}
+
+/*
+ * The primary button needs no special case in either theme, which is worth
+ * stating because it looks as though it should.
+ *
+ * Its label is `text-surface-base` on `bg-accent`. In the dark theme that is
+ * near-black ink on bright cyan, 10.9 : 1. In the light theme both ends invert
+ * — the accent becomes the dark colour and the surface the light one — so the
+ * same two tokens produce near-white on deep teal, 5.0 : 1. Measured, not
+ * assumed: an override was written here first and then removed, because it was
+ * solving a problem the tokens had already solved.
+ */

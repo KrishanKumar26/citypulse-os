@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from "react-leaflet";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { City, ConditionLevel, Zone, ZoneCondition, ZoneType } from "@/lib/api/types";
 
 /**
@@ -87,6 +87,42 @@ function resolveConditionColors(): Record<ConditionLevel, string> {
   return resolved;
 }
 
+/**
+ * The marker colours for the theme currently applied.
+ *
+ * A hook rather than a module constant. It was resolved once when the module
+ * loaded, which was correct while there was one theme and silently wrong the
+ * moment there were two: switching to light left every marker, and the legend
+ * beside them, painted in the dark theme's brighter status colours. Nothing
+ * would have looked broken — they are the same four hues — so the map would
+ * simply have been reading the wrong palette for as long as the tab stayed
+ * open.
+ *
+ * `data-theme` is watched rather than the media query, because it is what the
+ * stylesheet keys on and it moves for both causes: an explicit choice and a
+ * system change while none is held.
+ */
+export function useConditionColors(): Record<ConditionLevel, string> {
+  const [colors, setColors] = useState<Record<ConditionLevel, string>>(
+    FALLBACK_CONDITION_COLORS,
+  );
+
+  useEffect(() => {
+    const read = () => setColors(resolveConditionColors());
+    read();
+
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  return colors;
+}
+
+/** The pre-hydration values, for anything that must have a colour synchronously. */
 const CONDITION_COLORS: Record<ConditionLevel, string> = resolveConditionColors();
 
 /**
@@ -117,16 +153,25 @@ export const MAP_LAYERS: { id: MapLayer; label: string; legend: string }[] = [
  * traffic but no air quality is grey on the air layer and coloured on the
  * others, which is exactly what the reader should see.
  */
-export function colorForLayer(layer: MapLayer, condition: ZoneCondition): string | null {
+export function colorForLayer(
+  layer: MapLayer,
+  condition: ZoneCondition,
+  /**
+   * The palette to draw from. Defaults to the pre-hydration values so existing
+   * callers and tests are unchanged; the map and the legend pass the themed set
+   * from `useConditionColors`, which is what makes the markers follow a switch.
+   */
+  palette: Record<ConditionLevel, string> = CONDITION_COLORS,
+): string | null {
   const band = (value: number, thresholds: [number, number, number]): string =>
-    value >= thresholds[2] ? CONDITION_COLORS.CRITICAL
-      : value >= thresholds[1] ? CONDITION_COLORS.HIGH
-      : value >= thresholds[0] ? CONDITION_COLORS.MODERATE
-      : CONDITION_COLORS.NORMAL;
+    value >= thresholds[2] ? palette.CRITICAL
+      : value >= thresholds[1] ? palette.HIGH
+      : value >= thresholds[0] ? palette.MODERATE
+      : palette.NORMAL;
 
   switch (layer) {
     case "risk":
-      return condition.riskLevel ? CONDITION_COLORS[condition.riskLevel] : null;
+      return condition.riskLevel ? palette[condition.riskLevel] : null;
     case "traffic":
       // The pipeline's own classification, not a re-banding of the ratio. The
       // first attempt here restated the thresholds from common/transforms.py
@@ -135,11 +180,11 @@ export function colorForLayer(layer: MapLayer, condition: ZoneCondition): string
       // them said they were. congestion_level is computed once, upstream, and
       // travels with the reading.
       return condition.congestionLevel
-        ? CONDITION_COLORS[condition.congestionLevel as ConditionLevel]
+        ? palette[condition.congestionLevel as ConditionLevel]
         : null;
     case "incidents":
       return condition.activeIncidents === 0
-        ? CONDITION_COLORS.NORMAL
+        ? palette.NORMAL
         : band(condition.activeIncidents, [1, 2, 4]);
     case "air":
       // CPCB AQI bands: satisfactory / moderate / poor / very poor upward.
@@ -170,6 +215,32 @@ interface ZoneMapProps {
   conditions?: Map<string, ZoneCondition>;
 }
 
+/**
+ * Whether the light theme is applied, watched rather than read once.
+ *
+ * Same reason as the palette: the basemap and the marker colours both have to
+ * move when the reader switches, and neither is a CSS property that could just
+ * follow a variable — Leaflet takes a URL and a colour string.
+ */
+function useIsLightTheme(): boolean {
+  const [light, setLight] = useState(false);
+
+  useEffect(() => {
+    const read = () =>
+      setLight(document.documentElement.getAttribute("data-theme") === "light");
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  return light;
+}
+
+
 export default function ZoneMap({
   city,
   zones,
@@ -179,6 +250,8 @@ export default function ZoneMap({
   conditions,
 }: ZoneMapProps) {
   const center: [number, number] = [Number(city.centerLatitude), Number(city.centerLongitude)];
+  const palette = useConditionColors();
+  const basemap = useIsLightTheme() ? "light_all" : "dark_all";
 
   return (
     <MapContainer
@@ -193,10 +266,19 @@ export default function ZoneMap({
       <RecenterOnCityChange center={center} zoom={city.defaultZoom} />
 
       <TileLayer
-        // CARTO dark tiles suit the dark design system. If tiles fail to load —
-        // offline, or blocked — the base layer is simply empty and the zone
-        // markers still render, so the view degrades rather than breaking.
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        // The basemap follows the theme. Left on dark tiles, the light theme
+        // put a near-black map inside a white page — the one component on the
+        // screen that had not switched, and the most visually dominant.
+        //
+        // `key` forces Leaflet to replace the layer rather than mutate it: the
+        // url prop is read when the layer is created, so without this the tiles
+        // stay whichever set was loaded first.
+        //
+        // If tiles fail to load — offline, or blocked — the base layer is
+        // simply empty and the zone markers still render, so the view degrades
+        // rather than breaking.
+        key={basemap}
+        url={`https://{s}.basemaps.cartocdn.com/${basemap}/{z}/{x}/{y}{r}.png`}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         maxZoom={19}
       />
@@ -209,7 +291,7 @@ export default function ZoneMap({
         // the map as its feed dies hides the outage; a grey marker shows it.
         const color = condition
           ? condition.hasData
-            ? (colorForLayer(layer, condition) ?? NO_DATA_COLOR)
+            ? (colorForLayer(layer, condition, palette) ?? NO_DATA_COLOR)
             : NO_DATA_COLOR
           : ZONE_TYPE_COLORS[zone.zoneType];
 

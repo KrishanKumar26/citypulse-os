@@ -14,7 +14,7 @@ import {
   cn,
 } from "@/components/ui";
 import {
-  CONDITION_COLORS,
+  useConditionColors,
   MAP_LAYERS,
   NO_DATA_COLOR,
   type MapLayer,
@@ -313,11 +313,14 @@ function CoverageMetrics({
  * of measurement, not a fifth severity, and a reader has to be told which.
  */
 function ConditionLegend() {
+  // The same themed palette the markers draw from, so the key cannot describe
+  // one set of colours while the map shows another.
+  const palette = useConditionColors();
   const bands: Array<[string, string]> = [
-    ["Normal", CONDITION_COLORS.NORMAL],
-    ["Moderate", CONDITION_COLORS.MODERATE],
-    ["High", CONDITION_COLORS.HIGH],
-    ["Critical", CONDITION_COLORS.CRITICAL],
+    ["Normal", palette.NORMAL],
+    ["Moderate", palette.MODERATE],
+    ["High", palette.HIGH],
+    ["Critical", palette.CRITICAL],
     ["No data", NO_DATA_COLOR],
   ];
 
