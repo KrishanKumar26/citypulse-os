@@ -7,6 +7,7 @@ import { alertApi, forecastApi, intelligenceApi } from "@/lib/api/endpoints";
 import type {
   AlertDetail,
   AnomalyDetail,
+  CityOutlook,
   City,
   ZoneCondition,
   ZoneOutlook,
@@ -66,6 +67,28 @@ const METRIC_UNIT: Record<string, string> = {
   risk_score: "/ 100",
 };
 
+/**
+ * The zone's forecast, but only when it forecasts what the anomaly measured.
+ *
+ * The city outlook covers exactly one metric — whichever the model was trained
+ * for — and every zone in it carries a value for that metric alone. Shown
+ * beside an anomaly on a different measure, an occupancy ratio of 0.61 rendered
+ * as "0.6 / 100" under a risk row: the platform appearing to predict that a
+ * zone at 30 of 100 was about to collapse to nearly zero, in every row, on the
+ * first screen after sign-in. Two quantities, one wearing the other's unit.
+ *
+ * Exported so the rule can be tested without a render.
+ */
+export function outlookFor(
+  anomaly: Pick<AnomalyDetail, "metric" | "zoneId">,
+  outlook: Pick<CityOutlook, "targetMetric"> | undefined,
+  byZone: Map<string, ZoneOutlook>,
+): ZoneOutlook | undefined {
+  if (!outlook || outlook.targetMetric !== anomaly.metric) return undefined;
+  return byZone.get(anomaly.zoneId);
+}
+
+
 interface Situation {
   anomaly: AnomalyDetail;
   outlook: ZoneOutlook | undefined;
@@ -103,6 +126,17 @@ export function SituationFeed({
 
   const loading = anomaliesQuery.isLoading || outlookQuery.isLoading;
 
+  // The city outlook forecasts one metric — whichever the model was trained
+  // for — and every zone in it carries a value for that metric alone. Pairing
+  // it with an anomaly on a different measure put an occupancy ratio of 0.61
+  // under a risk row and rendered it "0.6 / 100", which read as the platform
+  // predicting that a zone at 30 of 100 was about to fall to nearly zero. Two
+  // different quantities, one of them wearing the other's unit.
+  // Pairing is done by outlookFor below, which is exported and tested apart
+  // from any render: the failure it prevents is a well-formed, correctly
+  // coloured number about the wrong quantity, which no rendering test would
+  // catch by looking at the markup.
+
   const outlookByZone = new Map((outlookQuery.data?.zones ?? []).map((z) => [z.zoneId, z]));
   const alertByZone = new Map(
     (alertsQuery.data?.items ?? [])
@@ -134,7 +168,8 @@ export function SituationFeed({
     .slice(0, 6)
     .map((anomaly) => ({
       anomaly,
-      outlook: outlookByZone.get(anomaly.zoneId),
+      // Only when the forecast is of the same thing the anomaly measured.
+      outlook: outlookFor(anomaly, outlookQuery.data, outlookByZone),
       alert: alertByZone.get(anomaly.zoneId),
       condition: conditions.get(anomaly.zoneId),
     }));
@@ -289,7 +324,7 @@ function SituationRow({
             </>
           ) : (
             <span className="text-content-disabled">
-              No forecast for this zone
+              No forecast for this measure
             </span>
           )}
         </Fact>
