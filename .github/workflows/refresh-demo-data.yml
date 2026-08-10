@@ -83,6 +83,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Prune raw events past retention
+        # First, not last. The database had no retention of any kind and the
+        # refresh runs hourly, so it reached Neon's 512 MB ceiling and every
+        # write began failing — including logins, while reads carried on and the
+        # dashboard looked healthy. Placed after the load, this step never ran:
+        # the load was the thing hitting DiskFull, and it took the rest of the
+        # job down with it. Freeing space has to come before needing it.
+        #
+        # Curated windows are kept — they are what every screen reads.
+        if: steps.check.outputs.configured == 'true'
+        continue-on-error: true
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: python -m pipeline.prune --days 30
+
       - name: Generate and load
         if: steps.check.outputs.configured == 'true'
         working-directory: data-engineering
@@ -202,19 +218,6 @@ jobs:
         env:
           CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
         run: python -m intelligence.rephrase
-
-      - name: Prune raw events past retention
-        # The database had no retention of any kind and the refresh runs hourly,
-        # so every raw event since the deployment was still stored. A free-tier
-        # Postgres does not degrade gracefully when it fills: reads keep working
-        # and every write fails, so the dashboard looks healthy while nobody can
-        # sign in. Curated windows are kept — they are what every screen reads.
-        if: steps.check.outputs.configured == 'true'
-        continue-on-error: true
-        working-directory: data-engineering
-        env:
-          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
-        run: python -m pipeline.prune --days 30
 
       - name: Report what landed
         if: steps.check.outputs.configured == 'true'
