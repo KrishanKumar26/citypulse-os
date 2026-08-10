@@ -123,7 +123,7 @@ export default function AnalyticsPage() {
                              bucketMinutes={bucket} area />
           </Panel>
 
-          <Panel title="Composite risk" description="The score the Command Center reports, over time.">
+          <Panel title="Overall risk" description="The score the Command Center reports, over time.">
             <TimeSeriesChart points={series.risk} unit="/ 100" decimals={0}
                              color="var(--color-status-high)" bucketMinutes={bucket} area />
           </Panel>

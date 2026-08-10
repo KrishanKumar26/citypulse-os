@@ -73,9 +73,10 @@ describe("KpiRow", () => {
     // Two different absences, deliberately worded differently. Traffic missing
     // means the platform has no reading at all; air quality missing usually
     // means the slower feed has not landed in this five-minute window, which is
-    // expected rather than a fault. Collapsing both into "Not measured" made a
-    // normal cadence look like a broken sensor.
-    expect(screen.getAllByText("Not measured").length).toBeGreaterThanOrEqual(2);
+    // expected rather than a fault. Collapsing both into one phrase made a
+    // normal cadence look like a broken sensor — so the assertion is that the
+    // two stay distinct, not that either keeps a particular wording.
+    expect(screen.getAllByText("No reading").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("No reading this window").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("0.0")).not.toBeInTheDocument();
     expect(screen.queryByText("0")).not.toBeInTheDocument();

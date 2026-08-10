@@ -370,7 +370,7 @@ export function Metric({
   /** Qualifies what the value covers — coverage, basis, or condition. */
   note?: string;
   emphasis?: "hero" | "default";
-  /** Shown in place of the value when it is null. Defaults to "Not measured". */
+  /** Shown in place of the value when it is null. Defaults to "No reading". */
   absenceReason?: string;
 }) {
   const hero = emphasis === "hero";
@@ -394,7 +394,7 @@ export function Metric({
 
       {value === null ? (
         <span className={cn("text-content-disabled", hero ? "text-[15px]" : "text-[13px]")}>
-          {absenceReason ?? "Not measured"}
+          {absenceReason ?? "No reading"}
         </span>
       ) : (
         <div className="flex items-baseline gap-1.5">

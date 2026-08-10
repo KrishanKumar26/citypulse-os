@@ -112,7 +112,7 @@ export function CityHealthRing({ kpis }: { kpis: CityKpis | null }) {
 
         <div className="absolute inset-x-0 top-[34px] flex flex-col items-center">
           {score === null ? (
-            <span className="text-[13px] text-content-disabled">Not measured</span>
+            <span className="text-[13px] text-content-disabled">No reading</span>
           ) : (
             <>
               <div className="flex items-baseline gap-1">

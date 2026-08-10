@@ -65,7 +65,7 @@ const METRICS: Array<{
     scale: 1,
   },
   {
-    value: "risk_score", label: "Composite risk", unit: "/ 100", decimals: 0,
+    value: "risk_score", label: "Overall risk", unit: "/ 100", decimals: 0,
     readHistory: (p) => (p.riskScore === null ? null : Number(p.riskScore)),
     scale: 1,
   },

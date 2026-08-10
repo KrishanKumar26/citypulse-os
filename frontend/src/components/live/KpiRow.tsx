@@ -119,9 +119,9 @@ export function KpiRow({
           value: kpis?.averageAqi != null ? String(kpis.averageAqi) : null,
           unit: "AQI",
           // Weather and air quality arrive on a slower feed than traffic, so a
-          // five-minute window usually holds no reading. "Not measured" would
-          // claim the platform never saw one, which is false and reads as a
-          // fault; the truth is that this window has none yet.
+          // five-minute window usually holds no reading. The default phrase,
+          // "No reading", would claim the platform never saw one — false, and
+          // it reads as a fault. The truth is that this window has none yet.
           absenceReason: "No reading this window",
           series: series.aqi,
         },

@@ -208,7 +208,7 @@ export function ZoneTable({
               <tr className="border-b border-line-subtle text-[11px] text-content-tertiary">
                 <SortableHeader label="Zone" col="name" sort={sort} setSort={setSort} align="left" />
                 <th scope="col" className="px-4 py-2.5 font-medium">Condition</th>
-                <SortableHeader label="Occupancy" col="occupancy" sort={sort} setSort={setSort} />
+                <SortableHeader label="Road capacity in use" col="occupancy" sort={sort} setSort={setSort} />
                 <SortableHeader label="Speed" col="speed" sort={sort} setSort={setSort} />
                 <SortableHeader label="AQI" col="aqi" sort={sort} setSort={setSort} />
                 <SortableHeader label="Incidents" col="incidents" sort={sort} setSort={setSort} />

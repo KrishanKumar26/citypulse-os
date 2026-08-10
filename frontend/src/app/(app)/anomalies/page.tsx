@@ -57,7 +57,7 @@ const METRIC_LABEL: Record<string, string> = {
   occupancy_ratio: "Congestion",
   average_speed_kph: "Average speed",
   vehicle_count: "Vehicle volume",
-  risk_score: "Composite risk",
+  risk_score: "Overall risk",
 };
 
 const METRIC_SCALE: Record<string, number> = { occupancy_ratio: 100 };

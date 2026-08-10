@@ -36,7 +36,7 @@ import { useSelectedCity } from "@/lib/city-context";
 const METRIC_LABEL: Record<string, string> = {
   occupancy_ratio: "Congestion",
   average_speed_kph: "Average speed",
-  risk_score: "Composite risk",
+  risk_score: "Overall risk",
 };
 
 const METRIC_SCALE: Record<string, number> = { occupancy_ratio: 100 };

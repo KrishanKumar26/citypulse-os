@@ -91,3 +91,7 @@ Thumbs.db
 .settings/
 .classpath
 .project
+
+# Large archives. A 1.4 GB Archive.zip at the repo root was swept up by an
+# "add -A" and rejected by the remote; nothing of this kind belongs in git.
+*.zip

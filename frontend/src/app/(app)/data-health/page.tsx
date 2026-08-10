@@ -147,7 +147,7 @@ export default function DataHealthPage() {
             // problem would go unseen.
             <Card>
               <CardHeader
-                title="Not measured"
+                title="No reading"
                 description="These stages run but write no quality metrics, so this page cannot speak for them."
               />
               <ul className="space-y-2 px-5 pb-4 pt-1">

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui";
 import { dataSourceApi } from "@/lib/api/endpoints";
 import type { DataSourceSummary } from "@/lib/api/types";
-import { PROVENANCE_DETAIL, PROVENANCE_LABEL, provenanceLevel } from "@/lib/provenance";
+import { PROVENANCE_LABEL, provenanceLevel, provenanceTooltip } from "@/lib/provenance";
 
 /**
  * Where the numbers came from.
@@ -150,7 +150,7 @@ function Row({ source }: { source: DataSourceSummary }) {
         <span className="text-content-secondary">{source.ingestionMode.toLowerCase()}</span>
       </td>
       <td className="px-4 py-2.5">
-        <Badge level={provenanceLevel(source.provenance)} title={PROVENANCE_DETAIL[source.provenance]}>
+        <Badge level={provenanceLevel(source.provenance)} title={provenanceTooltip(source.provenance)}>
           {PROVENANCE_LABEL[source.provenance]}
         </Badge>
       </td>

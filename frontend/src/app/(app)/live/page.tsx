@@ -21,6 +21,7 @@ import type { ConditionLevel, ZoneCondition } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
 import { useLiveSnapshot } from "@/lib/live/useLiveSnapshot";
 import { PROVENANCE_LABEL, describeAqi } from "@/lib/provenance";
+import { define, describeRisk } from "@/lib/wording";
 import { AqiValue } from "@/components/live/AqiValue";
 
 const ZoneMap = dynamic(() => import("@/components/map/ZoneMap"), {
@@ -180,22 +181,29 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
   // Grouped by what a reader is asking. Eight undifferentiated rows make
   // "is traffic bad" and "is the air bad" cost the same search; they are not
   // the same question and rarely asked at the same moment.
-  const groups: Array<[string, Array<[string, string]>]> = [
+  // [label, value, definition?] — the label is the plain phrase, the definition
+  // is the exact term and its bounds, shown on hover. Nothing is lost by
+  // dropping "occupancy ratio" from the surface as long as it stays one hover
+  // away for a reader who needs to cite or search for it.
+  type Row = [string, string, string?];
+  const groups: Array<[string, Row[]]> = [
     ["Traffic", [
-      ["Congestion", condition.congestionLevel ?? "Not measured"],
+      ["How backed up traffic is", condition.congestionLevel ?? "No reading", define("congestion")],
       [
-        "Occupancy",
+        "Road capacity in use",
         condition.occupancyRatio
-          ? `${(Number(condition.occupancyRatio) * 100).toFixed(0)}% of capacity`
-          : "Not measured",
+          ? `${(Number(condition.occupancyRatio) * 100).toFixed(0)}% in use`
+          : "No reading",
+        define("occupancy"),
       ],
       [
         "Average speed",
         condition.averageSpeedKph
           ? `${Number(condition.averageSpeedKph).toFixed(1)} km/h`
-          : "Not measured",
+          : "No reading",
+        define("speed"),
       ],
-      ["Vehicles", condition.vehicleCount != null ? String(condition.vehicleCount) : "Not measured"],
+      ["Vehicles counted", condition.vehicleCount != null ? String(condition.vehicleCount) : "No reading"],
     ]],
     ["Environment", [
       [
@@ -211,12 +219,13 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
           ? `${Number(condition.temperatureC).toFixed(1)}°C, ${
               condition.weatherCondition?.replace(/_/g, " ").toLowerCase() ?? "—"
             }${condition.weatherSource ? ` · ${PROVENANCE_LABEL[condition.weatherSource]}` : ""}`
-          : "Not measured",
+          : "No reading",
       ],
     ]],
     ["Activity", [
       ["Open incidents", String(condition.activeIncidents)],
       ["Scheduled events", String(condition.activeEvents)],
+      ["Readings behind this", String(condition.sampleCount), define("samples")],
     ]],
   ];
 
@@ -236,13 +245,16 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
           the others, and it was previously only legible inside a badge. */}
       <div className="border-b border-line-subtle px-5 py-4">
         <Metric
-          label="Composite risk"
+          label="Overall risk"
           emphasis="hero"
           value={condition.riskScore === null ? null : Number(condition.riskScore).toFixed(0)}
           unit="/ 100"
           level={condition.riskLevel ? LEVEL_BADGE[condition.riskLevel] : null}
           absenceReason="Not scored"
         />
+        <p className="mt-1 text-[12px] text-content-tertiary">
+          {describeRisk(condition.riskScore === null ? null : Number(condition.riskScore))}
+        </p>
       </div>
 
       <dl>
@@ -251,13 +263,24 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
             <div className="px-5 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.09em] text-content-disabled">
               {heading}
             </div>
-            {rows.map(([label, value]) => (
+            {rows.map(([label, value, definition]) => (
               <div key={label} className="flex items-center justify-between gap-4 px-5 py-1.5">
-                <dt className="text-[13px] text-content-tertiary">{label}</dt>
+                <dt
+                  title={definition}
+                  className={cn(
+                    "text-[13px] text-content-tertiary",
+                    // A dotted underline is the long-standing convention for
+                    // "there is more here". Without it the tooltip exists and
+                    // nobody finds it.
+                    definition && "cursor-help decoration-dotted underline-offset-4 hover:underline",
+                  )}
+                >
+                  {label}
+                </dt>
                 <dd
                   className={cn(
                     "text-[13px] tabular",
-                    value === "Not measured" ? "text-content-disabled" : "text-content-primary",
+                    value === "No reading" ? "text-content-disabled" : "text-content-primary",
                   )}
                 >
                   {value}

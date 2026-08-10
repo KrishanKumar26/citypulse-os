@@ -363,7 +363,7 @@ function ResultView({ result }: { result: SimulationDetail }) {
         <div className="grid gap-px bg-line-subtle sm:grid-cols-[minmax(0,1.15fr)_minmax(0,2fr)]">
           <div className="bg-surface-raised px-5 py-4">
             <Metric
-              label="Composite risk"
+              label="Overall risk"
               emphasis="hero"
               value={riskDelta === null ? null : `${riskDelta > 0 ? "+" : ""}${riskDelta.toFixed(0)}`}
               level={riskDelta === null ? null : toneOf(riskDelta, true)}

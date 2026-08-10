@@ -48,7 +48,7 @@ const METRIC_LABELS: Record<string, string> = {
   occupancy_ratio: "Road occupancy",
   average_speed_kph: "Average speed",
   vehicle_count: "Vehicle volume",
-  risk_score: "Composite risk",
+  risk_score: "Overall risk",
   aqi: "Air quality",
 };
 
