@@ -190,7 +190,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="border-t border-line-subtle px-5 py-3">
         <p className="text-[11px] text-content-disabled">
-          {TOTAL_COUNT} modules · demo data
+          {TOTAL_COUNT} modules · partly synthetic
         </p>
         {lockedCount > 0 && (
           // Says why part of the rail is greyed. Without it a locked module is
