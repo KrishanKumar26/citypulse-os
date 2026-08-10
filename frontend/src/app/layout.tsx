@@ -51,8 +51,8 @@ export const viewport: Viewport = {
   // theme's near-black while the page under it was white — the only part of
   // the product the toggle could not reach, because it is painted by the OS.
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#080b14" },
-    { media: "(prefers-color-scheme: light)", color: "#f6f8fc" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a1026" },
+    { media: "(prefers-color-scheme: light)", color: "#faf7f2" },
   ],
   width: "device-width",
   initialScale: 1,

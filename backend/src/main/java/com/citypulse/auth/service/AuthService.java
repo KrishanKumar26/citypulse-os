@@ -163,6 +163,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponses.Tokens login(AuthRequests.Login request, HttpServletRequest httpRequest) {
+        long startedAt = System.nanoTime();
         String email = normaliseEmail(request.email());
         Optional<User> found = userRepository.findByEmailAndDeletedAtIsNull(email);
 
@@ -170,7 +171,7 @@ public class AuthService {
             // Spend the same time as a real comparison before failing.
             passwordEncoder.matches(request.password(), DUMMY_HASH);
             auditService.recordFailure(AuditAction.LOGIN_FAILURE, email, "No account for address");
-            throw new Exceptions.InvalidCredentials();
+            throw failedCredentials(startedAt);
         }
 
         User user = found.get();
@@ -185,7 +186,7 @@ public class AuthService {
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             // Committed in its own transaction; this one is about to roll back.
             loginAttemptService.registerFailure(user.getId(), user.getEmail());
-            throw new Exceptions.InvalidCredentials();
+            throw failedCredentials(startedAt);
         }
 
         if (user.getStatus() == UserStatus.PENDING_VERIFICATION) {
@@ -236,6 +237,40 @@ public class AuthService {
         }
         user.setPasswordHash(passwordEncoder.encode(provenPassword));
         userRepository.save(user);
+    }
+
+
+    /**
+     * How long a rejected sign-in takes, whoever it was for.
+     *
+     * The dummy hash above equalises the hashing, and this class claimed
+     * "comparable timing" on that basis. Measured against production, it was
+     * not: an address with an account answered in 3.70, 3.69, 3.98 and 4.39
+     * seconds, one without in 2.56, 2.77, 2.90 and 2.89. A second apart, four
+     * times out of four — enough to sort a list of addresses into customers and
+     * strangers without ever guessing a password.
+     *
+     * The hash was never the difference. A known address costs an extra read,
+     * an extra write and an extra committed transaction, because the failure
+     * has to be counted towards the lockout; an unknown one has nothing to
+     * count. That work cannot be dropped and cannot be faked on the other
+     * branch without writing rows about accounts that do not exist.
+     *
+     * So both branches are held to a floor instead, which also flattens the
+     * variance a remote attack would otherwise average over. The cost is a held
+     * request thread, bounded by the ten-per-minute rate limiter.
+     */
+    private RuntimeException failedCredentials(long startedAt) {
+        long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000;
+        long remaining = securityProperties.lockout().minFailedResponse().toMillis() - elapsedMillis;
+        if (remaining > 0) {
+            try {
+                Thread.sleep(remaining);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return new Exceptions.InvalidCredentials();
     }
 
     // ---------------------------------------------------------------------
