@@ -1,4 +1,4 @@
-import { globSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -109,7 +109,11 @@ describe("the disabled token", () => {
     // The ramp cannot absorb the fix: content-tertiary is already 5.1 : 1, so
     // raising the disabled step to 4.5 would collapse the two into one. The
     // labels move up instead.
-    const sources = globSync("**/*.tsx", { cwd: ROOT, ignore: ["**/*.test.tsx"] });
+    // readdirSync with recursive, not globSync: the latter is only typed in
+    // newer @types/node than `npm ci` installs, so it type-checked here and
+    // failed the deployment's build.
+    const sources = readdirSync(ROOT, { recursive: true, encoding: "utf8" })
+      .filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"));
     const offenders: string[] = [];
 
     for (const file of sources) {
