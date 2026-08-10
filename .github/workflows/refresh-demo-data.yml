@@ -177,6 +177,20 @@ jobs:
           python -m intelligence.jobs detect
           python -m intelligence.jobs memory
 
+      - name: Rebuild stored anomaly sentences in the current wording
+        # The sentence shown on the Command Center is composed when a window is
+        # judged and stored on the row, so changing the wording leaves every
+        # existing row phrased the old way — for the six hours the feed covers,
+        # which is exactly the rows someone is reading now. This rebuilds them
+        # from the evidence already on the row, by the same function the
+        # detector calls. A no-op once they are current.
+        if: steps.check.outputs.configured == 'true'
+        continue-on-error: true
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: python -m intelligence.rephrase
+
       - name: Report what landed
         if: steps.check.outputs.configured == 'true'
         working-directory: data-engineering
