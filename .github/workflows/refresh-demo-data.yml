@@ -107,12 +107,11 @@ jobs:
           # dashboard said "Nothing suggested yet" on every row, which read as
           # "nothing to do" rather than "the engine cannot see this".
           #
-          # Sixty seconds gives five readings per window: past the guard with
-          # margin, and closer to what a real feed delivers. Measured before
-          # changing it — generation stays about a second and the load a
-          # couple, so the extra events cost the run almost nothing.
+          # A hundred seconds gives three readings per window — enough for the
+          # guard, without the five-fold write volume a sixty-second tick put
+          # on a free-tier database that had no retention at all.
           python -m generator.main --sink jsonl --out /tmp/refresh.jsonl \
-            --no-realtime --seed "$SEED" --tick-seconds 60 \
+            --no-realtime --seed "$SEED" --tick-seconds 100 \
             --simulate-from "$FROM" --simulate-to "$TO" --quiet
 
           python -m pipeline.local_runner --input /tmp/refresh.jsonl \
@@ -203,6 +202,19 @@ jobs:
         env:
           CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
         run: python -m intelligence.rephrase
+
+      - name: Prune raw events past retention
+        # The database had no retention of any kind and the refresh runs hourly,
+        # so every raw event since the deployment was still stored. A free-tier
+        # Postgres does not degrade gracefully when it fills: reads keep working
+        # and every write fails, so the dashboard looks healthy while nobody can
+        # sign in. Curated windows are kept — they are what every screen reads.
+        if: steps.check.outputs.configured == 'true'
+        continue-on-error: true
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+        run: python -m pipeline.prune --days 30
 
       - name: Report what landed
         if: steps.check.outputs.configured == 'true'
