@@ -11,6 +11,7 @@ import type {
   ZoneCondition,
   ZoneOutlook,
 } from "@/lib/api/types";
+import { define } from "@/lib/wording";
 
 /**
  * What needs attention, ranked — the first thing on the Command Center.
@@ -35,7 +36,8 @@ import type {
  * distrust.
  *
  * Ranked by severity first, then by how far from normal the reading was —
- * deviation is in scaled MADs, so it is comparable across metrics in a way that
+ * deviation is a multiple of the metric's usual spread, so it is comparable
+ * across metrics in a way that
  * a raw percentage is not.
  */
 
@@ -154,10 +156,10 @@ export function SituationFeed({
           loading
             ? "Reading the last six hours…"
             : situations.length === 0
-              ? "Nothing has departed from its baseline in the last six hours."
+              ? "Nothing has behaved unlike itself in the last six hours."
               : `${situations.length} ${situations.length === 1 ? "situation" : "situations"}` +
                 (critical > 0 ? ` · ${critical} critical` : "") +
-                " · ranked by severity, then by distance from normal"
+                " · most serious first"
         }
       />
 
@@ -281,17 +283,19 @@ function SituationRow({
               <span className="tabular font-medium text-ai">
                 {predicted.toFixed(scale === 100 ? 0 : 1)}
               </span>{" "}
-              {unit} at the next horizon
+              {unit} expected next
               {outlook.confidence != null && (
-                <span className="text-content-tertiary">
-                  {" "}· {(Number(outlook.confidence) * 100).toFixed(0)}% confidence, from measured
-                  error
+                <span
+                  className="cursor-help text-content-tertiary decoration-dotted underline-offset-4 hover:underline"
+                  title={define("confidence")}
+                >
+                  {" "}· {(Number(outlook.confidence) * 100).toFixed(0)}% confidence
                 </span>
               )}
             </>
           ) : (
             <span className="text-content-disabled">
-              No forecast issued for this zone
+              No forecast for this zone
             </span>
           )}
         </Fact>
@@ -304,10 +308,19 @@ function SituationRow({
         </Fact>
       </dl>
 
+      {/* The footnote said "20.0 scaled MADs from normal". That is the exact
+          name of the quantity and it sat under the sentence a duty officer
+          reads to decide whether to act. The figure stays — it is what ranks
+          this row above the next — with its definition on hover. */}
       <p className="mt-2.5 text-[10px] text-content-tertiary">
-        Detected {new Date(anomaly.detectedAt).toLocaleTimeString()} · baseline from{" "}
-        {anomaly.baselineSamples} historical windows · {Number(anomaly.deviationScore).toFixed(1)}{" "}
-        scaled MADs from normal
+        Spotted {new Date(anomaly.detectedAt).toLocaleTimeString()} · compared against{" "}
+        {anomaly.baselineSamples} past readings ·{" "}
+        <span
+          className="cursor-help decoration-dotted underline-offset-4 hover:underline"
+          title={define("deviation")}
+        >
+          {Number(anomaly.deviationScore).toFixed(1)}× the usual spread
+        </span>
       </p>
     </li>
   );

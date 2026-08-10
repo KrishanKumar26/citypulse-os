@@ -262,10 +262,17 @@ def detect(
         anomaly_type=kind,
         severity=_severity(deviation),
         percent_change=None if percent_change is None else round(percent_change, 2),
+        # Plain words, same claim. This string is read on the Command Center by
+        # whoever is deciding whether to act, and "20.0 standard deviations
+        # below the normal 43.23" asks them to hold a statistics lesson first.
+        # The deviation score is still carried on the record, and the screens
+        # show it with its exact definition — it is just no longer the sentence.
         explanation=(
-            f"{label} of {observed:,.2f} is {deviation:.1f} standard deviations {direction} "
-            f"the normal {baseline.median:,.2f} for this zone at this hour{change}. "
-            f"Baseline learned from {baseline.sample_count} historical windows."
+            f"{label} is {observed:,.2f}{change}. This zone is usually around "
+            f"{baseline.median:,.2f} at this time of day, so it is well "
+            f"{direction} normal — far enough out that it is unlikely to be "
+            f"ordinary variation. Compared against {baseline.sample_count} "
+            f"past readings for this zone at this hour."
         ),
     )
 
@@ -320,8 +327,9 @@ def detect_sustained(
         severity=_severity(deviation),
         percent_change=None if percent_change is None else round(percent_change, 2),
         explanation=(
-            f"{label} has stayed {direction} normal for {min_windows} consecutive windows, "
-            f"averaging {mean_recent:,.2f} against a usual {baseline.median:,.2f}. "
-            f"A sustained shift rather than a momentary spike."
+            f"{label} has stayed {direction} normal for {min_windows} readings in a "
+            f"row, averaging {mean_recent:,.2f} against a usual "
+            f"{baseline.median:,.2f}. This has settled in rather than being a "
+            f"passing spike."
         ),
     )

@@ -5,6 +5,7 @@ import { Badge, Card, CardHeader, EmptyState, Metric, Skeleton, cn } from "@/com
 import { Sparkline, TrendBadge, trendOf } from "@/components/charts/Sparkline";
 import { alertApi, forecastApi, liveApi } from "@/lib/api/endpoints";
 import type { ConditionLevel, Zone, ZoneCondition } from "@/lib/api/types";
+import { define } from "@/lib/wording";
 
 /**
  * What is happening in one zone, why, what is expected next, and what to do.
@@ -129,9 +130,9 @@ export function ZoneIntelligence({
         <div className="space-y-3">
           <div>
             <Metric
-              label="Congestion"
+              label="How full the roads are"
               value={condition?.occupancyRatio != null ? (Number(condition.occupancyRatio) * 100).toFixed(0) : null}
-              unit="% of capacity"
+              unit="% in use"
             />
             <div className="mt-1.5 flex items-center gap-2">
               <Sparkline points={occupancy} width={64} height={20} ariaLabel="Congestion over the recent window" />
@@ -179,12 +180,16 @@ export function ZoneIntelligence({
               </span>
             </div>
 
-            <p className="mt-1.5 text-[11px] text-content-tertiary">
-              {/* Confidence is derived from the model's measured error at this
-                  metric and horizon, not asserted. Saying so is the difference
-                  between a number and a claim. */}
-              {(Number(horizon.confidence) * 100).toFixed(0)}% confidence, from measured error on
-              held-out data
+            {/* Confidence is derived from the model's measured error at this
+                metric and horizon, not asserted — the difference between a
+                number and a claim. That reasoning is now on hover rather than
+                in the line, because "measured error on held-out data" is the
+                method and the reader wants the meaning. */}
+            <p
+              className="mt-1.5 cursor-help text-[11px] text-content-tertiary decoration-dotted underline-offset-4 hover:underline"
+              title={define("confidence")}
+            >
+              {(Number(horizon.confidence) * 100).toFixed(0)}% confidence
             </p>
 
             {horizon.contributingFactors.length > 0 && (

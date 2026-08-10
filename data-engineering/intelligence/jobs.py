@@ -131,11 +131,18 @@ def load_baselines(connection: psycopg.Connection) -> dict[tuple[int, str, int],
 # Detection
 # ---------------------------------------------------------------------------
 
+#: How each metric is named inside the sentence a duty officer reads.
+#:
+#: These go into `explanation`, which is stored and rendered verbatim on the
+#: Command Center, so they are the product's words rather than the schema's.
+#: "Composite risk" and "road occupancy" are the column names; neither is a
+#: phrase someone arrives already holding, and the frontend cannot fix them
+#: because by then they are inside a sentence in the database.
 METRIC_LABELS = {
-    "occupancy_ratio": "Road occupancy",
+    "occupancy_ratio": "How full the roads are",
     "average_speed_kph": "Average speed",
-    "vehicle_count": "Vehicle volume",
-    "risk_score": "Composite risk",
+    "vehicle_count": "The number of vehicles",
+    "risk_score": "Overall risk",
 }
 
 

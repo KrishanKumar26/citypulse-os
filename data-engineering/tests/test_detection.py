@@ -169,7 +169,25 @@ class TestExplanation:
         assert isinstance(outcome, Detection)
         assert "17,800" in outcome.explanation
         assert "8,000" in outcome.explanation
-        assert "54 historical windows" in outcome.explanation
+        assert "54" in outcome.explanation
+
+    def test_reads_without_a_statistics_course(self) -> None:
+        """The sentence is read on the Command Center by whoever decides to act.
+
+        It said "20.0 standard deviations below the normal 43.23", which is
+        exactly right and asks its reader to already know what a standard
+        deviation is. The deviation score is still on the record and the screens
+        still show it, with its definition — it is just no longer the sentence.
+        """
+        outcome = detect(17_800.0, a_baseline(median_value=8_000.0, mad=400.0, samples=54))
+
+        assert isinstance(outcome, Detection)
+        assert "standard deviation" not in outcome.explanation.lower()
+        assert "mad" not in outcome.explanation.lower().split()
+        # The claim survives the rewrite: what was seen, what is usual, and how
+        # much history the comparison rests on.
+        assert "usually" in outcome.explanation.lower()
+        assert outcome.deviation_score > 0
 
     def test_explains_a_non_anomaly_too(self) -> None:
         # A user who asks why nothing fired deserves an answer.
