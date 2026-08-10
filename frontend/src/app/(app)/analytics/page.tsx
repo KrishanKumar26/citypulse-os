@@ -67,7 +67,7 @@ export default function AnalyticsPage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="City Analytics"
-        subtitle={<>{city.name} · every series averaged across the zones that reported</>}
+        subtitle={<>{city.name} · how the city has been trending, averaged over the zones that reported</>}
         actions={
           <div className="flex items-center gap-1" role="group" aria-label="Time range">
           {RANGES.map((range) => (

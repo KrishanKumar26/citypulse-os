@@ -60,7 +60,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
     heading: "Intelligence",
     items: [
       { label: "AI Insights", href: "/insights", icon: "sparkle", permission: "analytics:read" },
-      { label: "Anomaly Detection", href: "/anomalies", icon: "pulse", permission: "anomaly:read" },
+      { label: "Unusual Activity", href: "/anomalies", icon: "pulse", permission: "anomaly:read" },
       { label: "Forecast", href: "/forecast", icon: "trending", permission: "forecast:read" },
       { label: "What-If Simulator", href: "/simulator", icon: "beaker", permission: "simulation:read" },
     ],
@@ -76,7 +76,7 @@ const NAV_SECTIONS: { heading: string; items: NavItem[] }[] = [
   {
     heading: "Analytics",
     items: [
-      { label: "City Analytics", href: "/analytics", icon: "chart", permission: "telemetry:read" },
+      { label: "Trends", href: "/analytics", icon: "chart", permission: "telemetry:read" },
     ],
   },
   {

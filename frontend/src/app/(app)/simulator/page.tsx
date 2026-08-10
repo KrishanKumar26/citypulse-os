@@ -141,7 +141,7 @@ export default function SimulatorPage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="What-If Simulator"
-        subtitle={`${city.name} · hypothetical scenarios run against currently observed conditions`}
+        subtitle={`${city.name} · try a scenario before it happens, against what the city is doing now`}
       />
 
       {/*

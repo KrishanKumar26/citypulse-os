@@ -84,7 +84,7 @@ export default function AlertsPage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="Alert Center"
-        subtitle={`${city.name} · raised automatically from curated conditions`}
+        subtitle={`${city.name} · raised automatically when conditions cross a line`}
         actions={
           <>
             <Button

@@ -102,7 +102,7 @@ export default function LivePage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="Live Intelligence"
-        subtitle={`${city.name} · streaming conditions from curated telemetry`}
+        subtitle={`${city.name} · what every part of the city is doing right now`}
       >
         <LiveStatusBar
           snapshot={snapshot}

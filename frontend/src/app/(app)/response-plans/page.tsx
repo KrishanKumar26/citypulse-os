@@ -66,7 +66,7 @@ export default function ResponsePlansPage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="Action Center"
-        subtitle={<>{city.name} · what is being done about the situations on the board</>}
+        subtitle={<>{city.name} · what is being done about each situation, and who has it</>}
         actions={
           <>
             <Button

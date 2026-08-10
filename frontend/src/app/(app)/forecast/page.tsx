@@ -136,7 +136,7 @@ export default function ForecastPage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="Forecast Engine"
-        subtitle={`${city.name} · predictions with the error that produced their confidence`}
+        subtitle={`${city.name} · what the next few hours look like, and how much to trust it`}
         actions={forecastQuery.data?.demoData ? <DemoDataBadge /> : undefined}
       />
 
@@ -320,9 +320,9 @@ function HorizonTable({
         </tbody>
       </table>
       <p className="border-t border-line-subtle px-5 py-3 text-[11px] leading-relaxed text-content-tertiary">
-        Confidence is computed from the measured error beside it, not asserted. &ldquo;vs
-        naive&rdquo; compares against predicting no change at all — a model that cannot beat that
-        has not earned its complexity.
+        Confidence comes from the error measured beside it, not from a claim. The
+        comparison column is against simply predicting no change at all — a model that
+        cannot beat that is not worth running.
       </p>
     </div>
   );

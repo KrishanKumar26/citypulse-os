@@ -79,7 +79,7 @@ export default function InsightsPage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="AI Insights"
-        subtitle={<>{city.name} · what the platform can say, and the data it says it from</>}
+        subtitle={<>{city.name} · questions the platform can answer, and the readings behind each answer</>}
       />
 
       {insights.isError && (

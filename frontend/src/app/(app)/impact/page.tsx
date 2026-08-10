@@ -75,7 +75,7 @@ export default function ImpactPage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="Impact"
-        subtitle={<>{city.name} · actions taken, and what the city did afterwards</>}
+        subtitle={<>{city.name} · what was done, and whether the city actually changed</>}
       />
 
       {query.isError ? (

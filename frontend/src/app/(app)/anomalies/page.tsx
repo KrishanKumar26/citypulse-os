@@ -19,6 +19,7 @@ import { Sparkline } from "@/components/charts/Sparkline";
 import { intelligenceApi, liveApi } from "@/lib/api/endpoints";
 import type { AnomalyDetail } from "@/lib/api/types";
 import { useSelectedCity } from "@/lib/city-context";
+import { define } from "@/lib/wording";
 
 /**
  * Anomaly Detection — an investigation workspace over what the platform found.
@@ -119,7 +120,7 @@ export default function AnomaliesPage() {
     <div className="space-y-5 p-5">
       <PageHeader
         title="Anomaly Detection"
-        subtitle={<>{city.name} · departures from what each zone normally does at this hour of the week</>}
+        subtitle={<>{city.name} · places behaving unlike themselves, measured against their own usual week</>}
         actions={
           <div className="flex items-center gap-1" role="group" aria-label="Time range">
           {RANGES.map((range) => (
@@ -383,10 +384,15 @@ function AnomalyDetailPanel({ anomaly }: { anomaly: AnomalyDetail | null }) {
       <div className="grid grid-cols-3 gap-3 border-b border-line-subtle px-5 py-4">
         <Figure label="Observed" value={observed.toFixed(d)} unit={unit} tone={status} />
         <Figure label="Expected" value={baseline.toFixed(d)} unit={unit} />
+        {/* "scaled MADs" was the unit on screen. It is the correct name for the
+            quantity and tells a reader nothing; the number it labelled is the
+            whole reason this screen exists. The plain unit says what the figure
+            is a multiple of, and the exact term is on the label. */}
         <Figure
-          label="Deviation"
+          label="How unusual"
+          labelTitle={define("deviation")}
           value={Number(anomaly.deviationScore).toFixed(1)}
-          unit="scaled MADs"
+          unit="× usual spread"
         />
       </div>
 
@@ -523,18 +529,28 @@ function ZoneRanking({
 
 function Figure({
   label,
+  labelTitle,
   value,
   unit,
   tone,
 }: {
   label: string;
+  /** The exact definition, on the label. Dotted underline marks that it exists. */
+  labelTitle?: string;
   value: string;
   unit?: string;
   tone?: string;
 }) {
   return (
     <div>
-      <Label>{label}</Label>
+      <Label>
+        <span
+          title={labelTitle}
+          className={cn(labelTitle && "cursor-help decoration-dotted underline-offset-4 hover:underline")}
+        >
+          {label}
+        </span>
+      </Label>
       <div className="mt-1 flex items-baseline gap-1">
         <span className={cn("tabular text-[19px] font-semibold leading-none", tone ? `text-status-${tone}` : "text-content-primary")}>
           {value}

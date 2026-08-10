@@ -66,6 +66,14 @@ export const TERMS = {
       "The learned baseline — what this zone usually does at this hour of the " +
       "week, from weeks of its own history. Not a fixed threshold.",
   },
+  deviation: {
+    label: "How unusual",
+    definition:
+      "Deviation score, in scaled median absolute deviations — how far this " +
+      "reading sits from the zone's own usual spread. Median-based rather than " +
+      "mean-based, so the outlier being measured does not inflate the yardstick " +
+      "it is measured against. Around 3 is notable; above 5 is far outside normal.",
+  },
   confidence: {
     label: "how much to trust it",
     definition:
