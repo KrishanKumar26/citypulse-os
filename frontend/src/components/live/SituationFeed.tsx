@@ -12,7 +12,9 @@ import type {
   ZoneCondition,
   ZoneOutlook,
 } from "@/lib/api/types";
-import { define } from "@/lib/wording";
+import { Glyph } from "@/components/ui/icons";
+import { describeSituation } from "@/lib/situation-language";
+import { TechnicalDetails, type TechnicalRow } from "./TechnicalDetails";
 
 /**
  * What needs attention, ranked — the first thing on the Command Center.
@@ -233,12 +235,44 @@ function SituationRow({
   const status = SEVERITY_TO_STATUS[anomaly.severity as keyof typeof SEVERITY_TO_STATUS] ?? "moderate";
   const scale = METRIC_SCALE[anomaly.metric] ?? 1;
   const unit = METRIC_UNIT[anomaly.metric] ?? "";
-  const observed = Number(anomaly.observedValue) * scale;
-  const baseline = Number(anomaly.baselineValue) * scale;
+  const raw = Number(anomaly.observedValue);
+  const rawBaseline = Number(anomaly.baselineValue);
+  const copy = describeSituation(anomaly.metric, raw, rawBaseline);
+  const anomalyRatio = rawBaseline === 0 ? null : raw / rawBaseline;
 
   // The forecast's own move against what it was issued from — not against the
   // anomaly's observation, which is a different window.
   const predicted = outlook ? Number(outlook.predictedValue) * scale : null;
+
+  const technicalRows: TechnicalRow[] = [
+    { label: copy.technicalLabel, value: (raw * scale).toFixed(scale === 100 ? 0 : 2) },
+    { label: "Historical baseline", value: (rawBaseline * scale).toFixed(scale === 100 ? 0 : 2) },
+    {
+      label: "Anomaly ratio",
+      value: anomalyRatio === null ? "No baseline" : `${anomalyRatio.toFixed(1)}x`,
+    },
+    { label: "Historical readings", value: String(anomaly.baselineSamples) },
+    { label: "Observed at", value: new Date(anomaly.detectedAt).toLocaleTimeString() },
+    {
+      label: "Historical spread",
+      value: `${Number(anomaly.deviationScore).toFixed(1)}x`,
+    },
+    {
+      label: "Forecast",
+      value:
+        predicted === null
+          ? "Not available"
+          : `${predicted.toFixed(scale === 100 ? 0 : 1)} ${unit}`.trim(),
+    },
+    // The sentence the pipeline stored. It is the detector's own words and the
+    // only row here a reader can quote back when questioning a detection.
+    { label: "Detector note", value: anomaly.explanation },
+  ];
+
+  // A rule's recommendation is a different kind of claim from generic advice
+  // about this kind of situation, and the card must not let them read alike:
+  // one was computed for this zone, the other is true of congestion anywhere.
+  const ruleAction = alert?.recommendedAction ?? null;
 
   return (
     <li className="relative px-5 py-4">
@@ -251,29 +285,22 @@ function SituationRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge level={status}>{SEVERITY_HEADING[anomaly.severity] ?? anomaly.severity}</Badge>
-            <h3 className="text-[14px] font-semibold tracking-tight text-content-primary">
-              {anomaly.zoneName}
-            </h3>
+            <span className={cn("flex items-center gap-1.5", `text-status-${status}`)}>
+              <Glyph name={copy.icon} size={15} />
+              <h3 className="text-[14px] font-semibold tracking-tight">{copy.title}</h3>
+            </span>
+            <span className="text-[13px] text-content-secondary">{anomaly.zoneName}</span>
           </div>
 
-          {/* The situation leads, in the words someone would use to report it.
-              It used to sit under a "WHY" label in a three-column grid, below a
-              row reading "23.4 / 100 against a usual 10.3 · +126%" — which is a
-              table row, and made the reader assemble the meaning themselves. */}
-          <p className={cn("mt-2 text-[15px] font-medium leading-snug", `text-status-${status}`)}>
-            {anomaly.explanation}
-          </p>
+          {/* One sentence, aimed at whoever is deciding whether to take another
+              route. Everything a duty officer needs to judge the detection is
+              still here, in the panel at the foot of the card. */}
+          <p className="mt-2 text-[14px] leading-snug text-content-primary">{copy.headline}</p>
 
-          {/* The figures behind it, one line, in the units the rest of the
-              product shows them in. */}
-          <p className="mt-1.5 text-[12px] text-content-tertiary">
-            <span className="tabular text-content-secondary">
-              {observed.toFixed(scale === 100 ? 0 : 1)}
-            </span>{" "}
-            {unit} now · usually{" "}
-            <span className="tabular">{baseline.toFixed(scale === 100 ? 0 : 1)}</span>{" "}
-            {unit} at this hour
+          <p className="mt-2 text-[13px] text-content-secondary">
+            <span className="tabular font-medium text-content-primary">{copy.reading}</span>
           </p>
+          <p className="text-[12px] text-content-tertiary">{copy.usual}</p>
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
@@ -301,57 +328,25 @@ function SituationRow({
         </div>
       </div>
 
-      {/* Two facts, not three. "Why" was the sentence that now leads the card,
-          and repeating it under a label was the layout asking the reader to
-          find the point twice. What is left is what an operator does next:
-          where this is heading, and whether anything is suggested. */}
       <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-        <Fact label="Where this is heading">
-          {outlook && predicted !== null ? (
-            <>
-              <span className="tabular font-medium text-ai">
-                {predicted.toFixed(scale === 100 ? 0 : 1)}
-              </span>{" "}
-              {unit} expected next
-              {outlook.confidence != null && (
-                <span
-                  className="cursor-help text-content-tertiary decoration-dotted underline-offset-4 hover:underline"
-                  title={define("confidence")}
-                >
-                  {" "}· {(Number(outlook.confidence) * 100).toFixed(0)}% confidence
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="text-content-disabled">
-              No forecast for this measure
-            </span>
-          )}
-        </Fact>
+        <Fact label="What this means">{copy.meaning}</Fact>
 
-        {/* A rule's, or nothing. Never composed here — the product does not
-            invent advice it has no basis for. */}
-        <Fact label="Suggested action">
-          {alert?.recommendedAction ?? (
-            <span className="text-content-disabled">Nothing suggested yet</span>
+        <Fact label="Recommended action">
+          {ruleAction ?? (
+            <>
+              {copy.guidance}{" "}
+              <span
+                className="text-content-disabled"
+                title="No alert rule has fired for this zone, so this is general guidance for this kind of situation rather than a recommendation computed for here."
+              >
+                · general guidance
+              </span>
+            </>
           )}
         </Fact>
       </dl>
 
-      {/* The footnote said "20.0 scaled MADs from normal". That is the exact
-          name of the quantity and it sat under the sentence a duty officer
-          reads to decide whether to act. The figure stays — it is what ranks
-          this row above the next — with its definition on hover. */}
-      <p className="mt-2.5 text-[10px] text-content-tertiary">
-        Spotted {new Date(anomaly.detectedAt).toLocaleTimeString()} · compared against{" "}
-        {anomaly.baselineSamples} past readings for this zone at this hour ·{" "}
-        <span
-          className="cursor-help decoration-dotted underline-offset-4 hover:underline"
-          title={define("deviation")}
-        >
-          {Number(anomaly.deviationScore).toFixed(1)}× the usual spread
-        </span>
-      </p>
+      <TechnicalDetails rows={technicalRows} />
     </li>
   );
 }
