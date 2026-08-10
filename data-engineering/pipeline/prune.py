@@ -46,6 +46,24 @@ EVENT_TABLES = (
     ("dead_letter_events", "received_at"),
 )
 
+#: Issued forecasts, on their own clock.
+#:
+#: 81 MB of the 489 MB, and growing five horizons per zone per run. A forecast
+#: has done its work once it has been scored: `forecast_accuracy` keeps the
+#: comparison against what actually happened, which is what the accuracy screen
+#: and the confidence figures read. Kept a week so a recent forecast can still
+#: be inspected beside the outcome it was scored on.
+FORECAST_TABLES = (("forecasts", "issued_at"),)
+
+FORECAST_RETENTION_DAYS = 7
+
+#: `zone_metrics` is deliberately absent from both, and it is the largest table
+#: here at 221 MB. It is the platform's memory: every chart, every baseline and
+#: every anomaly comparison reads it, and the baseline query has no lower bound
+#: at all — cutting it would quietly thin the baselines until the detector
+#: started declining windows for insufficient history. Freeing space by
+#: forgetting what normal looks like is not a trade this product should make.
+
 DEFAULT_RETENTION_DAYS = 3
 
 
@@ -74,7 +92,7 @@ def _by_size_ascending(connection: psycopg.Connection) -> list[tuple[str, int]]:
     space and enlarges the room available to the next, which matters when the
     reason for running this at all is that there is almost none.
     """
-    names = [name for name, _ in EVENT_TABLES]
+    names = [name for name, _ in EVENT_TABLES + FORECAST_TABLES]
     with connection.cursor(row_factory=tuple_row) as cursor:
         cursor.execute(
             """
@@ -109,9 +127,14 @@ def report(connection: psycopg.Connection) -> None:
             print(f"    {name:<26} {pretty}")
 
 
-def prune(connection: psycopg.Connection, *, days: int) -> int:
+def prune(
+    connection: psycopg.Connection,
+    *,
+    days: int,
+    tables: tuple[tuple[str, str], ...],
+) -> int:
     total = 0
-    for table, column in EVENT_TABLES:
+    for table, column in tables:
         with connection.cursor(row_factory=tuple_row) as cursor:
             # to_regclass rather than a try/except: a table this deployment does
             # not have is not an error, and a failed DELETE would abort the
@@ -149,7 +172,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         print(f"\n  dropping raw events older than {args.days} days:")
-        removed = prune(connection, days=args.days)
+        removed = prune(connection, days=args.days, tables=EVENT_TABLES)
+        print(f"  dropping forecasts older than {FORECAST_RETENTION_DAYS} days:")
+        removed += prune(connection, days=FORECAST_RETENTION_DAYS, tables=FORECAST_TABLES)
         if not removed:
             print("    nothing was past retention")
 

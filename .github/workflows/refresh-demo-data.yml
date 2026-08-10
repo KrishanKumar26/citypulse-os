@@ -97,7 +97,7 @@ jobs:
         working-directory: data-engineering
         env:
           CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
-        run: python -m pipeline.prune --days 30
+        run: python -m pipeline.prune
 
       - name: Generate and load
         if: steps.check.outputs.configured == 'true'
