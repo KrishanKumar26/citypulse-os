@@ -342,7 +342,7 @@ function CorrelationsPanel({
     <Card className="overflow-hidden">
       <CardHeader
         title="What tends to occur together"
-        description="Measured co-occurrence across the full history. These are not causal claims."
+        description="How often these moved together across the full history. Moving together is not the same as one causing the other."
       />
       {loading ? (
         <LoadingState label="Loading correlations" rows={3} />

@@ -187,7 +187,7 @@ export default function ForecastPage() {
       <Card className="overflow-hidden">
         <CardHeader
           title={`${config.label} outlook`}
-          description="Each horizon is a separately trained model with its own measured error."
+          description="Each distance ahead is its own model, with its own record of how far it usually misses."
           action={
             forecastQuery.data?.currentValue != null ? (
               <span className="text-[12px] text-content-tertiary">
@@ -258,13 +258,13 @@ function HorizonTable({
       <table className="w-full text-left text-[13px]">
         <thead>
           <tr className="border-b border-line-subtle text-[12px] text-content-tertiary">
-            <th scope="col" className="px-5 py-2.5 font-medium">Horizon</th>
+            <th scope="col" className="px-5 py-2.5 font-medium">How far ahead</th>
             <th scope="col" className="px-5 py-2.5 font-medium">At</th>
             <th scope="col" className="px-5 py-2.5 text-right font-medium">Predicted</th>
             <th scope="col" className="px-5 py-2.5 text-right font-medium">95% interval</th>
             <th scope="col" className="px-5 py-2.5 text-right font-medium">Confidence</th>
             <th scope="col" className="px-5 py-2.5 font-medium">Level</th>
-            <th scope="col" className="px-5 py-2.5 text-right font-medium">Measured error</th>
+            <th scope="col" className="px-5 py-2.5 text-right font-medium">Typical miss</th>
           </tr>
         </thead>
         <tbody>
@@ -307,7 +307,7 @@ function HorizonTable({
                     {point.improvementOverBaseline && (
                       <span className="ml-1.5 text-[11px] text-status-normal">
                         {Number(point.improvementOverBaseline) > 0 ? "+" : ""}
-                        {Number(point.improvementOverBaseline).toFixed(0)}% vs naive
+                        {Number(point.improvementOverBaseline).toFixed(0)}% better than guessing no change
                       </span>
                     )}
                   </>
@@ -439,7 +439,7 @@ function AccuracyPanel({
         <table className="w-full text-left text-[13px]">
           <thead>
             <tr className="border-b border-line-subtle text-[12px] text-content-tertiary">
-              <th scope="col" className="px-5 py-2.5 font-medium">Horizon</th>
+              <th scope="col" className="px-5 py-2.5 font-medium">How far ahead</th>
               <th scope="col" className="px-5 py-2.5 text-right font-medium">Production</th>
               <th scope="col" className="px-5 py-2.5 text-right font-medium">Holdout</th>
               <th scope="col" className="px-5 py-2.5 text-right font-medium">In interval</th>

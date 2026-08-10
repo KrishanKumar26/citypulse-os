@@ -402,7 +402,7 @@ function AnomalyDetailPanel({ anomaly }: { anomaly: AnomalyDetail | null }) {
           <div className="mt-2">
             <Sparkline points={series} width={260} height={44} ariaLabel="Zone history around the detection" />
             <p className="mt-1.5 text-[10px] text-content-tertiary">
-              The zone&rsquo;s recent curated windows. A reading that climbed for an hour and one
+              The zone&rsquo;s recent readings. A reading that climbed for an hour and one
               that spiked in a single window print the same percentage.
             </p>
           </div>

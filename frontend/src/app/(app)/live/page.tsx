@@ -118,7 +118,7 @@ export default function LivePage() {
         <Card className="overflow-hidden lg:col-span-2">
           <CardHeader
             title="Zone conditions"
-            description="Colour is measured composite risk. Grey means the zone reported nothing recently."
+            description="Colour is the zone's overall risk. Grey means it reported nothing recently."
           />
           <div className="h-[460px]">
             {!snapshot ? (
@@ -326,7 +326,7 @@ function ZoneConditionTable({
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader title="All zones" description="Ordered by composite risk, highest first." />
+      <CardHeader title="All zones" description="Worst overall risk first." />
 
       {loading ? (
         <LoadingState label="Loading conditions" rows={5} />
