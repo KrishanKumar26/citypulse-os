@@ -98,8 +98,21 @@ jobs:
           # failure can be reproduced.
           SEED=$(date -u +%Y%m%d%H)
 
+          # One tick per zone per minute, not per five. The curated window is
+          # five minutes, so a 300-second tick put exactly one reading in each
+          # — and every alert rule begins with a thin-sample guard requiring
+          # three. Every rule therefore returned empty before it looked at the
+          # value, and the deployment raised zero alerts in every city while
+          # Delhi sat at 1.03 of capacity, past the 1.00 threshold. The
+          # dashboard said "Nothing suggested yet" on every row, which read as
+          # "nothing to do" rather than "the engine cannot see this".
+          #
+          # Sixty seconds gives five readings per window: past the guard with
+          # margin, and closer to what a real feed delivers. Measured before
+          # changing it — generation stays about a second and the load a
+          # couple, so the extra events cost the run almost nothing.
           python -m generator.main --sink jsonl --out /tmp/refresh.jsonl \
-            --no-realtime --seed "$SEED" --tick-seconds 300 \
+            --no-realtime --seed "$SEED" --tick-seconds 60 \
             --simulate-from "$FROM" --simulate-to "$TO" --quiet
 
           python -m pipeline.local_runner --input /tmp/refresh.jsonl \
