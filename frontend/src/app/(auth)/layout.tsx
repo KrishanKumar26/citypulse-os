@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { BrandPanel } from "@/components/auth/BrandPanel";
+import { DATA_DISCLOSURE_SHORT } from "@/lib/wording";
 
 /**
  * The shell every authentication screen sits in.
@@ -57,8 +58,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
         <footer className="px-6 pb-6 lg:hidden">
           <p className="text-[11px] leading-relaxed text-content-disabled">
-            Demonstration environment. Traffic, weather and incidents are synthetic
-            and labelled as such; air quality is real.
+            Demonstration environment. {DATA_DISCLOSURE_SHORT}
           </p>
         </footer>
       </div>

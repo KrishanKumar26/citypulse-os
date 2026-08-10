@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ApiStatus } from "@/components/system/ApiStatus";
+import { DATA_DISCLOSURE } from "@/lib/wording";
 
 /**
  * What the visitor is signing into, shown beside the form.
@@ -146,9 +147,8 @@ export function BrandPanel() {
           </div>
 
           <p className="mt-3 text-[11px] leading-relaxed text-content-disabled">
-            Demonstration environment. Traffic, weather and incidents are
-            synthetic and labelled as such; air quality is real and credited on
-            the Data Sources screen.
+            Demonstration environment. {DATA_DISCLOSURE} The real feeds are
+            credited on the Data Sources screen.
           </p>
         </div>
       </div>

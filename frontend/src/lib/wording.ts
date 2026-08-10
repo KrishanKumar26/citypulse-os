@@ -99,3 +99,23 @@ export function describeRisk(score: number | null): string {
 
 /** "No reading" rather than "Not measured" — shorter, and true of every signal. */
 export const NO_READING = "No reading";
+
+/**
+ * What on this deployment is real and what is generated.
+ *
+ * One sentence, defined once. It had been written out by hand in five places —
+ * the landing hero, the landing footer, the auth panel, the auth footer and the
+ * Data Sources page — and when weather stopped being generated, four of them
+ * went on saying it was. The one claim whose entire job is to say which figures
+ * can be trusted was the claim that drifted, and nothing caught it because
+ * every copy was independently plausible.
+ *
+ * Anything that describes the mix of feeds imports from here. Adding a real
+ * feed is then one edit, not five and a search.
+ */
+export const DATA_DISCLOSURE =
+  "Air quality and weather are real. Traffic, incidents and city events are " +
+  "generated, and say so wherever they appear.";
+
+/** The same fact where there is room for one line. */
+export const DATA_DISCLOSURE_SHORT = "Air quality and weather are real; the rest is generated.";

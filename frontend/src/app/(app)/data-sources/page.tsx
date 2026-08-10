@@ -122,12 +122,13 @@ export default function DataSourcesPage() {
           <Attributions sources={data.sources} />
 
           <p className="text-[11px] leading-relaxed text-content-tertiary">
-            Traffic, weather, incidents and city events are synthetic, and labelled so. That is
-            the platform&rsquo;s design rather than a gap: it runs with no external API at all, so
+            Traffic, incidents and city events are generated, and labelled so. That is the
+            platform&rsquo;s design rather than a gap: it runs with no external API at all, so
             the pipeline, the models and the dashboard can be exercised end to end without
-            depending on a third party&rsquo;s availability or terms. Air quality is the exception
-            — where a real feed covers a zone it replaces the generated reading outright, never
-            averages with it, and every figure in the product carries which of the three it is.
+            depending on a third party&rsquo;s availability or terms. Air quality and weather
+            are the exceptions — where a real feed covers a zone it replaces the generated
+            reading outright, never averages with it, and every figure in the product carries
+            which of the three it is.
           </p>
         </>
       )}

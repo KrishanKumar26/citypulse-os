@@ -249,9 +249,10 @@ export function Badge({
  * quality became real, and it now hides the platform's strongest claim under a
  * label that reads as "none of this counts".
  *
- * So it names the feeds that are still invented. Traffic, weather, incidents
- * and events are the generator's because no free real-time feed exists for them
- * in these cities; air quality is not, and the badge no longer says otherwise.
+ * So it names the feeds that are still invented. Traffic, incidents and events
+ * are the generator's because no free real-time feed exists for them in these
+ * cities; air quality and weather are not, and the badge no longer says
+ * otherwise.
  * The full sentence is on hover, and every figure carries its own provenance
  * where it is displayed — this is the summary, not the disclosure.
  */

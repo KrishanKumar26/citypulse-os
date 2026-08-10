@@ -3,6 +3,7 @@ import Link from "next/link";
 import { API_BASE_URL } from "@/lib/api/client";
 
 import { CapabilityGlyph } from "@/components/marketing/CapabilityGlyph";
+import { DATA_DISCLOSURE } from "@/lib/wording";
 import { CountUp } from "@/components/marketing/CountUp";
 import { Reveal } from "@/components/marketing/Reveal";
 import { PipelineDiagram } from "@/components/marketing/PipelineDiagram";
@@ -98,10 +99,8 @@ function Hero() {
         </h1>
 
         <p className="mt-6 max-w-2xl text-[15px] leading-relaxed text-content-secondary">
-          Traffic, weather, air quality, incidents and events arrive as five
-          separate feeds. CityPulse OS correlates them per zone and per window
-          into one account of what is happening, what follows from it, and what
-          a change would do — with every figure carrying where it came from.
+          Traffic, weather and air quality are usually watched separately.
+          CityPulse OS reads them together, and says what follows.
         </p>
 
         <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -124,8 +123,8 @@ function Hero() {
             lands on the sign-in form — better read here than discovered there. */}
         <p className="mt-4 text-[13px] text-content-tertiary">
           The Command Centre asks you to sign in; accounts are free and read-only.
-          Air quality is real. Traffic, weather and incidents are synthetic and
-          labelled as such throughout the product.
+          Air quality and weather are real. Traffic, incidents and city events
+          are generated, and say so wherever they appear.
         </p>
 
         </div>
@@ -142,10 +141,10 @@ function Hero() {
             // WEATHER, AIR_QUALITY, INCIDENT and CITY_EVENT — and the hero
             // diagram three hundred pixels above this row draws those five.
             // The page was contradicting itself within one screen.
-            { count: 5, label: "Signal types correlated" },
-            { count: 5, label: "Forecast horizons" },
-            { count: 7, label: "Access roles" },
-            { value: "API-first", label: "Every capability exposed" },
+            { count: 5, label: "Kinds of signal, read together" },
+            { count: 5, label: "Forecasts, 15 minutes to 6 hours" },
+            { count: 7, label: "Levels of access" },
+            { value: "Open API", label: "Everything here, callable" },
           ].map((stat) => (
             <div key={stat.label} className="bg-surface-raised px-5 py-6">
               <div className="text-2xl font-semibold tabular tracking-tight">
@@ -166,12 +165,12 @@ function ProblemSection() {
       <div className="mx-auto max-w-6xl px-6 py-20">
         <SectionLabel>The problem</SectionLabel>
         <h2 className="mt-3 max-w-2xl text-2xl font-semibold tracking-tight md:text-3xl">
-          Cities generate enormous amounts of data that nothing connects.
+          A city already knows all of this. Nothing puts it together.
         </h2>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <Reveal className="rounded-lg border border-line-subtle bg-surface-raised p-6">
-            <h3 className="text-sm font-medium text-content-secondary">Analysed independently</h3>
+            <h3 className="text-sm font-medium text-content-secondary">Watched separately</h3>
             <div className="mt-4 space-y-2.5">
               {[
                 "Rainfall 18 mm/h",
@@ -185,14 +184,15 @@ function ProblemSection() {
               ))}
             </div>
             <p className="mt-4 text-[13px] text-content-tertiary">
-              Four separate readings. Four separate dashboards. No conclusion.
+              Four readings on four screens. Each one true, and none of them
+              says what is about to happen.
             </p>
           </Reveal>
 
           <Reveal delay={120} className="rounded-lg border border-accent/25 bg-accent-subtle p-6">
-            <h3 className="text-sm font-medium text-accent">Correlated</h3>
+            <h3 className="text-sm font-medium text-accent">Read together</h3>
             <div className="mt-4 rounded border border-line-default bg-surface-overlay p-4">
-              <div className="text-[13px] text-content-tertiary">Assessment</div>
+              <div className="text-[13px] text-content-tertiary">What this adds up to</div>
               <div className="mt-1.5 text-[15px] font-medium">
                 High probability of a traffic surge in the next 30 minutes.
               </div>
@@ -210,9 +210,9 @@ function ProblemSection() {
               </div>
             </div>
             <p className="mt-4 text-[13px] text-content-tertiary">
-              Illustrative figures showing the shape of a correlation result. The
-              correlation engine is live — measured correlations, with
-              impliesCausation false in every payload.
+              These numbers are an example of what an answer looks like, not a
+              live reading. The engine behind it is built and running: it measures
+              how signals move together, and never claims one caused the other.
             </p>
           </Reveal>
         </div>
@@ -223,12 +223,12 @@ function ProblemSection() {
 
 function HowItWorks() {
   const steps = [
-    { step: "01", title: "Observe", body: "Traffic, weather, air quality, incidents and events stream continuously into a single pipeline." },
-    { step: "02", title: "Understand", body: "Signals are validated, correlated and attributed to city zones, so conditions have explanations rather than only values." },
-    { step: "03", title: "Predict", body: "Forecasts across five horizons, each reporting confidence derived from measured error." },
-    { step: "04", title: "Simulate", body: "Run a hypothetical — heavy rain plus a 40,000-person event — and see the projected impact before it happens." },
-    { step: "05", title: "Recommend", body: "Turn predictions into specific actions, each traceable to the data that produced it." },
-    { step: "06", title: "Act", body: "Alerts, APIs and integrations so intelligence reaches the systems that respond." },
+    { step: "01", title: "Observe", body: "Five kinds of signal arrive continuously — traffic, weather, air quality, incidents and scheduled events — into one place." },
+    { step: "02", title: "Understand", body: "Each is checked, tied to the part of the city it describes, and read against the others — so a condition comes with a reason, not just a number." },
+    { step: "03", title: "Predict", body: "Five forecasts, from fifteen minutes ahead to six hours, each saying how much to trust it." },
+    { step: "04", title: "Simulate", body: "Try a scenario before it happens: heavy rain during a 40,000-person event, and what that does to the roads." },
+    { step: "05", title: "Recommend", body: "Turn what is coming into specific things to do, each one tracing back to the readings behind it." },
+    { step: "06", title: "Act", body: "Send it where it is acted on — alerts to people, an API to the systems that respond." },
   ];
 
   return (
@@ -266,18 +266,18 @@ function Capabilities() {
   // evaluator has two minutes (PRD §42) and needs to know what they can open
   // right now — a phase number answers a different question.
   const capabilities = [
-    { title: "Live Intelligence", glyph: "live" as const, body: "Zone conditions streamed over server-sent events: traffic state, speed, air quality and composite risk, each citing the curated window it came from.", state: "Live" },
-    { title: "Forecast Engine", glyph: "forecast" as const, body: "Congestion, speed, volume and risk across 15 minutes to 6 hours. Confidence is computed from the model's error on held-out data, not asserted.", state: "Live" },
-    { title: "What-If Simulator", glyph: "simulation" as const, body: "Weather, events, closures and volume changes run against real observed conditions, with the engine's assumptions documented and unit tested.", state: "Live" },
-    { title: "Anomaly Detection", glyph: "anomaly" as const, body: "Departures from what each zone normally does at this hour of the week — a learned baseline, not a fixed threshold.", state: "Live" },
-    { title: "City Memory", glyph: "memory" as const, body: "Past situations and what actually followed them. When too few comparable situations exist, it says so rather than guessing.", state: "Live" },
+    { title: "Live Intelligence", glyph: "live" as const, body: "See every part of the city as it is right now — how heavy traffic is, how clean the air is, and how much of a problem the two add up to. Every figure says which minute it is from.", state: "Live" },
+    { title: "Forecast Engine", glyph: "forecast" as const, body: "What the next fifteen minutes to six hours look like — and how much to trust each one. The confidence comes from how far past forecasts landed from what actually happened.", state: "Live" },
+    { title: "What-If Simulator", glyph: "simulation" as const, body: "Ask what heavy rain, a stadium event or a closed road would do — before deciding. The answer is worked out against conditions the city actually recorded, not a blank slate.", state: "Live" },
+    { title: "Anomaly Detection", glyph: "anomaly" as const, body: "Notices when a place is behaving unlike itself. It learns what each zone normally does at this hour of this weekday, so a busy Monday rush does not read as an emergency.", state: "Live" },
+    { title: "City Memory", glyph: "memory" as const, body: "Finds the times this already happened, and what followed. When there are too few comparable days to answer from, it says so instead of guessing.", state: "Live" },
     // Live, and the sentence is narrower than it was. The card claimed
     // "rate limiting for third-party access" and marked the whole thing
     // Planned, which was wrong in both directions: keys and the OpenAPI
     // document have shipped, and the rate limiter covers /api/v1/auth only —
     // it slows credential stuffing, not a key holder's traffic. Saying so is
     // cheaper than a reader discovering it against production.
-    { title: "API Platform", glyph: "api" as const, body: "Documented OpenAPI surface and scoped API keys, authenticated on their own header and frozen to the permissions held when issued. Per-key rate limiting is not built; the limiter that exists guards the authentication endpoints.", state: "Live" },
+    { title: "API Platform", glyph: "api" as const, body: "Everything the screens show is available to other systems too, through a documented API with keys that carry only the access they were given. Per-key rate limiting is not built; the limiter that exists guards sign-in.", state: "Live" },
   ];
 
   return (
@@ -546,9 +546,8 @@ function SiteFooter() {
         </div>
 
         <p className="mt-8 border-t border-line-subtle pt-6 text-[12px] leading-relaxed text-content-disabled">
-          Demonstration environment. Traffic, weather, incidents and city events
-          are synthetic and labelled as demo data throughout the product. Air
-          quality is real and credited on the Data Sources screen.
+          Demonstration environment. {DATA_DISCLOSURE} The real feeds are
+          credited on the Data Sources screen.
         </p>
       </div>
     </footer>
