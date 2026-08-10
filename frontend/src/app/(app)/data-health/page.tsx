@@ -288,7 +288,7 @@ function StageRow({ stage }: { stage: StageQuality }) {
 function Figure({ label, value, tone }: { label: string; value: string; tone?: "high" | "moderate" }) {
   return (
     <div>
-      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-content-disabled">
+      <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-content-tertiary">
         {label}
       </div>
       <div

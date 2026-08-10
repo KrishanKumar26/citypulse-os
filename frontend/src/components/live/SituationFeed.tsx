@@ -354,7 +354,7 @@ function SituationRow({
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-medium uppercase tracking-[0.09em] text-content-disabled">
+      <dt className="text-[10px] font-medium uppercase tracking-[0.09em] text-content-tertiary">
         {label}
       </dt>
       <dd className="mt-1 text-[12px] leading-relaxed text-content-secondary">{children}</dd>

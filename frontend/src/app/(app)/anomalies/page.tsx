@@ -563,7 +563,7 @@ function Figure({
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] font-medium uppercase tracking-[0.09em] text-content-disabled">
+    <span className="text-[10px] font-medium uppercase tracking-[0.09em] text-content-tertiary">
       {children}
     </span>
   );

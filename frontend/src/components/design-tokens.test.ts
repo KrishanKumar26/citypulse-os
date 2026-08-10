@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { globSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -94,5 +94,34 @@ describe("the light theme", () => {
 
     const missing = [...declared(dark)].filter((token) => !declared(light).has(token));
     expect(missing, `not overridden for light: ${missing.join(", ")}`).toEqual([]);
+  });
+});
+
+describe("the disabled token", () => {
+  it("is not used for text that has to be read", () => {
+    // It measures 2.8 : 1 in the light theme and 2.6 : 1 in the dark one, which
+    // is correct for the *absence* of a value — an em-dash, "never", "No
+    // reading" — and wrong for a heading. It was carrying the sidebar's section
+    // headings, the card labels ("What this means", "Recommended action") and
+    // the demo-data disclosure, all of which a reader is meant to read, at
+    // under 3 : 1 in both themes.
+    //
+    // The ramp cannot absorb the fix: content-tertiary is already 5.1 : 1, so
+    // raising the disabled step to 4.5 would collapse the two into one. The
+    // labels move up instead.
+    const sources = globSync("**/*.tsx", { cwd: ROOT, ignore: ["**/*.test.tsx"] });
+    const offenders: string[] = [];
+
+    for (const file of sources) {
+      const text = readFileSync(join(ROOT, file), "utf8");
+      for (const match of text.matchAll(/class[nN]ame=\{?["`][^"`]*["`]/g)) {
+        const classes = match[0];
+        if (classes.includes("text-content-disabled") && classes.includes("uppercase")) {
+          offenders.push(`${file}: ${classes.slice(0, 60)}`);
+        }
+      }
+    }
+
+    expect(offenders, offenders.join("\n")).toEqual([]);
   });
 });

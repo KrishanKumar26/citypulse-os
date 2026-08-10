@@ -171,7 +171,7 @@ function Contributions({ kpis }: { kpis: CityKpis | null }) {
 
   return (
     <div className="mt-4 w-full space-y-2.5 border-t border-line-subtle pt-4">
-      <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-content-disabled">
+      <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-content-tertiary">
         What went into this
       </p>
       {rows.map((row) => (

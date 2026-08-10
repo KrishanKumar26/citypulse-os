@@ -547,7 +547,7 @@ function SiteFooter() {
           </nav>
         </div>
 
-        <p className="mt-8 border-t border-line-subtle pt-6 text-[12px] leading-relaxed text-content-disabled">
+        <p className="mt-8 border-t border-line-subtle pt-6 text-[12px] leading-relaxed text-content-tertiary">
           Demonstration environment. {DATA_DISCLOSURE} The real feeds are
           credited on the Data Sources screen.
         </p>

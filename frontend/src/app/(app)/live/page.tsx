@@ -260,7 +260,7 @@ function ZoneDetail({ condition }: { condition: ZoneCondition | null | undefined
       <dl>
         {groups.map(([heading, rows]) => (
           <div key={heading} className="border-b border-line-subtle last:border-0">
-            <div className="px-5 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.09em] text-content-disabled">
+            <div className="px-5 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.09em] text-content-tertiary">
               {heading}
             </div>
             {rows.map(([label, value, definition]) => (

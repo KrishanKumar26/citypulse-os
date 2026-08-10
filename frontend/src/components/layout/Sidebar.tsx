@@ -129,7 +129,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="flex-1 overflow-y-auto px-3 py-4">
         {NAV_SECTIONS.map((section) => (
           <div key={section.heading} className="mb-5">
-            <div className="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-content-disabled">
+            <div className="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-content-tertiary">
               {section.heading}
             </div>
             <ul className="space-y-0.5">
@@ -190,7 +190,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="border-t border-line-subtle px-5 py-3">
-        <p className="text-[11px] text-content-disabled">
+        <p className="text-[11px] text-content-tertiary">
           {TOTAL_COUNT} modules · partly synthetic
         </p>
         {lockedCount > 0 && (

@@ -146,7 +146,7 @@ export function BrandPanel() {
             <ApiStatus coldStartHint />
           </div>
 
-          <p className="mt-3 text-[11px] leading-relaxed text-content-disabled">
+          <p className="mt-3 text-[11px] leading-relaxed text-content-tertiary">
             Demonstration environment. {DATA_DISCLOSURE} The real feeds are
             credited on the Data Sources screen.
           </p>

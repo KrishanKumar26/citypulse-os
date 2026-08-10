@@ -153,7 +153,7 @@ export function ZoneIntelligence({
 
       {/* ---------- What is expected next ---------- */}
       <section className="border-b border-line-subtle px-5 py-4">
-        <h4 className="mb-2.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-content-disabled">
+        <h4 className="mb-2.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-content-tertiary">
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-ai" />
           Expected next
         </h4>
@@ -194,7 +194,7 @@ export function ZoneIntelligence({
 
             {horizon.contributingFactors.length > 0 && (
               <div className="mt-3">
-                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-content-disabled">
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-content-tertiary">
                   Why
                 </p>
                 <ul className="space-y-1">
@@ -222,7 +222,7 @@ export function ZoneIntelligence({
 
       {/* ---------- What to do ---------- */}
       <section className="px-5 py-4">
-        <h4 className="mb-2 text-[10px] font-medium uppercase tracking-[0.1em] text-content-disabled">
+        <h4 className="mb-2 text-[10px] font-medium uppercase tracking-[0.1em] text-content-tertiary">
           Recommended action
         </h4>
         {action ? (

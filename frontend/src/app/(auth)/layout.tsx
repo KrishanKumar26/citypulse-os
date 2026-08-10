@@ -57,7 +57,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         </main>
 
         <footer className="px-6 pb-6 lg:hidden">
-          <p className="text-[11px] leading-relaxed text-content-disabled">
+          <p className="text-[11px] leading-relaxed text-content-tertiary">
             Demonstration environment. {DATA_DISCLOSURE_SHORT}
           </p>
         </footer>
