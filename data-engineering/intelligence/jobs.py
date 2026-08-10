@@ -181,7 +181,10 @@ def detect_anomalies(connection: psycopg.Connection, *, lookback: timedelta = DE
                 declined += 1
                 continue
 
-            outcome = detect(float(observed), baseline, metric_label=METRIC_LABELS[metric])
+            outcome = detect(
+                float(observed), baseline,
+                metric_label=METRIC_LABELS[metric], metric=metric,
+            )
             if isinstance(outcome, InsufficientData):
                 declined += 1
                 continue

@@ -162,32 +162,61 @@ class TestDetection:
 
 
 class TestExplanation:
-    def test_states_observation_baseline_and_gap(self) -> None:
-        """PRD §13's example form: 17,800 against a normal of 8,000."""
-        outcome = detect(17_800.0, a_baseline(median_value=8_000.0, mad=400.0, samples=54))
+    def test_states_the_situation_not_the_method(self) -> None:
+        """The line a duty officer reads on a critical row.
 
-        assert isinstance(outcome, Detection)
-        assert "17,800" in outcome.explanation
-        assert "8,000" in outcome.explanation
-        assert "54" in outcome.explanation
-
-    def test_reads_without_a_statistics_course(self) -> None:
-        """The sentence is read on the Command Center by whoever decides to act.
-
-        It said "20.0 standard deviations below the normal 43.23", which is
-        exactly right and asks its reader to already know what a standard
-        deviation is. The deviation score is still on the record and the screens
-        still show it, with its definition — it is just no longer the sentence.
+        It said "20.0 standard deviations below the normal 43.23", then a
+        plainer sentence describing the same thing — how the detection was made.
+        Neither answers the question being asked, which is how bad this is
+        against what is normal. The evidence is still on the row and still shown
+        in the footnote; it is not the message.
         """
-        outcome = detect(17_800.0, a_baseline(median_value=8_000.0, mad=400.0, samples=54))
-
+        outcome = detect(
+            1.62, a_baseline(median_value=0.53, mad=0.03, samples=12),
+            metric_label="Roads", metric="occupancy_ratio",
+        )
         assert isinstance(outcome, Detection)
-        assert "standard deviation" not in outcome.explanation.lower()
-        assert "mad" not in outcome.explanation.lower().split()
-        # The claim survives the rewrite: what was seen, what is usual, and how
-        # much history the comparison rests on.
-        assert "usually" in outcome.explanation.lower()
-        assert outcome.deviation_score > 0
+        assert outcome.explanation == (
+            "Roads are 3.1x as full as usual for this time of day."
+        )
+        for method in ("standard deviation", "baseline", "past readings", "variation"):
+            assert method not in outcome.explanation.lower()
+
+    def test_compares_downward_in_words_someone_would_say(self) -> None:
+        # English does not compare up and down with the same words. "3.1x as
+        # full" is right; "0.4x as full" is not something anyone says.
+        outcome = detect(
+            15.7, a_baseline(median_value=42.8, mad=2.0, samples=12),
+            metric_label="Speed", metric="average_speed_kph",
+        )
+        assert isinstance(outcome, Detection)
+        assert outcome.explanation == (
+            "Traffic is moving at 37% of the usual speed for this time of day."
+        )
+
+    def test_speaks_in_multiples_so_the_units_cannot_disagree(self) -> None:
+        """The bug this also fixes.
+
+        The card scales occupancy by 100 to show "162% of capacity" while the
+        stored sentence carried the raw 1.62, so one card presented the same
+        fact as two different numbers. A ratio has no units to disagree about.
+        """
+        outcome = detect(
+            1.62, a_baseline(median_value=0.53, mad=0.03, samples=12),
+            metric_label="Roads", metric="occupancy_ratio",
+        )
+        assert isinstance(outcome, Detection)
+        assert "1.62" not in outcome.explanation
+        assert "0.53" not in outcome.explanation
+
+    def test_says_so_when_there_is_nothing_to_compare_against(self) -> None:
+        from intelligence.detection import explain
+
+        sentence = explain(
+            label="Roads", observed=1.62, baseline_median=0.0, samples=0,
+            direction="above", percent_change=None, metric="occupancy_ratio",
+        )
+        assert "no usual level" in sentence
 
     def test_explains_a_non_anomaly_too(self) -> None:
         # A user who asks why nothing fired deserves an answer.
@@ -232,11 +261,14 @@ class TestExplainIsSharedWithTheBackfill:
         from intelligence.detection import explain
 
         baseline = a_baseline(median_value=8_000.0, mad=400.0, samples=54)
-        outcome = detect(17_800.0, baseline, metric_label="Vehicle volume")
+        outcome = detect(
+            17_800.0, baseline, metric_label="Vehicles", metric="vehicle_count",
+        )
         assert isinstance(outcome, Detection)
 
         rebuilt = explain(
-            label="Vehicle volume",
+            metric="vehicle_count",
+            label="Vehicles",
             observed=17_800.0,
             baseline_median=8_000.0,
             samples=54,
@@ -244,15 +276,3 @@ class TestExplainIsSharedWithTheBackfill:
             percent_change=outcome.percent_change,
         )
         assert outcome.explanation == rebuilt
-
-    def test_states_the_evidence_without_the_statistics(self) -> None:
-        from intelligence.detection import explain
-
-        sentence = explain(
-            label="Average speed", observed=7.13, baseline_median=43.23,
-            samples=12, direction="below", percent_change=-84.0,
-        )
-        assert "7.13" in sentence and "43.23" in sentence and "12" in sentence
-        assert "-84%" in sentence
-        assert "standard deviation" not in sentence.lower()
-        assert "mad" not in sentence.lower().split()

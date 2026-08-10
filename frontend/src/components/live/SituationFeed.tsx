@@ -57,13 +57,6 @@ const SEVERITY_HEADING: Record<string, string> = {
   LOW: "Watch",
 };
 
-const METRIC_LABEL: Record<string, string> = {
-  occupancy_ratio: "Congestion",
-  average_speed_kph: "Average speed",
-  vehicle_count: "Vehicle volume",
-  risk_score: "Overall risk",
-};
-
 /** Display multiplier — ratios are stored 0-1 and read as percentages. */
 const METRIC_SCALE: Record<string, number> = { occupancy_ratio: 100 };
 const METRIC_UNIT: Record<string, string> = {
@@ -207,7 +200,6 @@ function SituationRow({
   const unit = METRIC_UNIT[anomaly.metric] ?? "";
   const observed = Number(anomaly.observedValue) * scale;
   const baseline = Number(anomaly.baselineValue) * scale;
-  const change = anomaly.percentChange === null ? null : Number(anomaly.percentChange);
 
   // The forecast's own move against what it was issued from — not against the
   // anomaly's observation, which is a different window.
@@ -227,23 +219,25 @@ function SituationRow({
             <h3 className="text-[14px] font-semibold tracking-tight text-content-primary">
               {anomaly.zoneName}
             </h3>
-            <span className="text-[11px] text-content-tertiary">
-              {METRIC_LABEL[anomaly.metric] ?? anomaly.metric}
-            </span>
           </div>
 
-          {/* WHAT — the reading against the baseline it broke. */}
-          <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-[13px]">
-            <span className={cn("tabular text-[20px] font-semibold leading-none", `text-status-${status}`)}>
+          {/* The situation leads, in the words someone would use to report it.
+              It used to sit under a "WHY" label in a three-column grid, below a
+              row reading "23.4 / 100 against a usual 10.3 · +126%" — which is a
+              table row, and made the reader assemble the meaning themselves. */}
+          <p className={cn("mt-2 text-[15px] font-medium leading-snug", `text-status-${status}`)}>
+            {anomaly.explanation}
+          </p>
+
+          {/* The figures behind it, one line, in the units the rest of the
+              product shows them in. */}
+          <p className="mt-1.5 text-[12px] text-content-tertiary">
+            <span className="tabular text-content-secondary">
               {observed.toFixed(scale === 100 ? 0 : 1)}
-            </span>
-            <span className="text-[11px] text-content-tertiary">{unit}</span>
-            <span className="text-content-tertiary">
-              against a usual {baseline.toFixed(scale === 100 ? 0 : 1)}
-              {change !== null && (
-                <> · {change > 0 ? "+" : ""}{change.toFixed(0)}%</>
-              )}
-            </span>
+            </span>{" "}
+            {unit} now · usually{" "}
+            <span className="tabular">{baseline.toFixed(scale === 100 ? 0 : 1)}</span>{" "}
+            {unit} at this hour
           </p>
         </div>
 
@@ -272,12 +266,12 @@ function SituationRow({
         </div>
       </div>
 
-      <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-3">
-        {/* WHY — written at detection time, so it stays true as the code moves. */}
-        <Fact label="Why">{anomaly.explanation}</Fact>
-
-        {/* WHAT NEXT — the model's, or an explicit absence. */}
-        <Fact label="Expected next">
+      {/* Two facts, not three. "Why" was the sentence that now leads the card,
+          and repeating it under a label was the layout asking the reader to
+          find the point twice. What is left is what an operator does next:
+          where this is heading, and whether anything is suggested. */}
+      <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+        <Fact label="Where this is heading">
           {outlook && predicted !== null ? (
             <>
               <span className="tabular font-medium text-ai">
@@ -300,10 +294,11 @@ function SituationRow({
           )}
         </Fact>
 
-        {/* WHAT TO DO — a rule's, or nothing. Never composed here. */}
-        <Fact label="Recommended action">
+        {/* A rule's, or nothing. Never composed here — the product does not
+            invent advice it has no basis for. */}
+        <Fact label="Suggested action">
           {alert?.recommendedAction ?? (
-            <span className="text-content-disabled">No supporting signal available</span>
+            <span className="text-content-disabled">Nothing suggested yet</span>
           )}
         </Fact>
       </dl>
@@ -314,7 +309,7 @@ function SituationRow({
           this row above the next — with its definition on hover. */}
       <p className="mt-2.5 text-[10px] text-content-tertiary">
         Spotted {new Date(anomaly.detectedAt).toLocaleTimeString()} · compared against{" "}
-        {anomaly.baselineSamples} past readings ·{" "}
+        {anomaly.baselineSamples} past readings for this zone at this hour ·{" "}
         <span
           className="cursor-help decoration-dotted underline-offset-4 hover:underline"
           title={define("deviation")}

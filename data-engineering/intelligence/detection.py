@@ -204,45 +204,82 @@ def explain(
     samples: int,
     direction: str,
     percent_change: float | None,
+    metric: str | None = None,
 ) -> str:
-    """The sentence shown on the Command Center for one detection.
+    """What is happening here, for the person deciding whether to act.
 
-    Its own function because two callers need to produce it identically: the
+    Its own function because two callers must produce it identically: the
     detector, when it judges a window, and `intelligence.rephrase`, which
-    rebuilds the sentence for rows written before the wording changed. Two
-    copies of this string would drift the first time either was edited, and the
-    drift would be invisible — both would still read as sentences.
+    rebuilds it for rows written before the wording changed.
 
-    It said "20.0 standard deviations below the normal 43.23", which is exactly
-    right and asks the person deciding whether to send someone to hold a
-    statistics lesson first. The deviation score is still on the record and the
-    screens still show it, with its definition; it is no longer the prose.
+    **It states the situation, not the method.** It said "20.0 standard
+    deviations below the normal 43.23", then "far enough out that it is unlikely
+    to be ordinary variation. Compared against 12 past readings" — the second
+    was plainer English describing the same thing: how the detection was made.
+    A duty officer reading a critical row needs to know how bad it is against
+    what is normal, and everything about medians, spreads and sample counts is
+    the evidence for that, not the message. The evidence is still on the row and
+    still shown, in the footnote, on hover.
 
-    Nothing here is inferred. Every value is one the detection already
-    established, which is what makes rebuilding an old row honest rather than a
-    rewrite of history.
+    **It speaks in multiples, which also fixes a unit bug.** The card scales
+    occupancy by 100 to show "162% of capacity" while this sentence carried the
+    raw 1.62, so one card showed the same fact as two different numbers. A ratio
+    has no units to disagree about — 1.62 against 0.53 is 3.1x whichever way
+    either is displayed.
     """
-    change = f" ({percent_change:+.0f}%)" if percent_change is not None else ""
-    return (
-        f"{label} is {observed:,.2f}{change}. This zone is usually around "
-        f"{baseline_median:,.2f} at this time of day, so it is well "
-        f"{direction} normal — far enough out that it is unlikely to be "
-        f"ordinary variation. Compared against {samples} past readings for "
-        f"this zone at this hour."
+    if not baseline_median:
+        # No usable baseline to compare against; say the reading and stop
+        # rather than dividing by zero or implying a comparison there is none of.
+        return f"{label} is {observed:,.2f}. There is no usual level for this zone at this hour yet."
+
+    ratio = observed / baseline_median
+    phrasing = _PHRASING_ABOVE if ratio >= 1 else _PHRASING_BELOW
+    fallback = (
+        "{label} is {mult} the usual for this time of day."
+        if ratio >= 1
+        else "{label} is at {mult} of the usual for this time of day."
     )
+    amount = f"{ratio:.1f}x" if ratio >= 1 else f"{ratio * 100:.0f}%"
+    return phrasing.get(metric or "", fallback).format(label=label, mult=amount)
+
+
+#: How each metric reads as a situation rather than a measurement.
+#:
+#: Two sets, because English does not compare upward and downward with the same
+#: words: roads are "3.1x as full as usual" but "at 37% of their usual fullness",
+#: and one template forced to serve both produces a sentence nobody would say.
+#: Keyed by the metric code so each can name the thing the way an operator would
+#: say it out loud rather than the way the column is named. The fallbacks cover
+#: a metric added later — duller, never wrong.
+_PHRASING_ABOVE = {
+    "occupancy_ratio": "Roads are {mult} as full as usual for this time of day.",
+    "average_speed_kph": "Traffic is moving {mult} the usual speed for this time of day.",
+    "vehicle_count": "There are {mult} as many vehicles as usual for this time of day.",
+    "risk_score": "Overall risk is {mult} the usual for this time of day.",
+}
+
+_PHRASING_BELOW = {
+    "occupancy_ratio": "Roads are at {mult} of their usual fullness for this time of day.",
+    "average_speed_kph": "Traffic is moving at {mult} of the usual speed for this time of day.",
+    "vehicle_count": "There are {mult} as many vehicles as usual for this time of day.",
+    "risk_score": "Overall risk is at {mult} of the usual for this time of day.",
+}
+
 
 def detect(
     observed: float,
     baseline: Baseline,
     *,
     metric_label: str | None = None,
+    metric: str | None = None,
 ) -> Detection | InsufficientData:
     """Judge one observation against what this zone normally does.
 
     The explanation is built here rather than at render time so it is stored
-    with the anomaly and stays true after the code changes. It states the
-    observation, the normal, and the gap — which is the whole of PRD §13's
-    example: "17,800 against a normal of 8,000".
+    with the anomaly and stays true after the code changes. `metric` is the
+    column code and only reaches `explain`, which uses it to name the thing in
+    the words someone would say out loud; the judgement itself does not vary by
+    metric.
     """
     if not baseline.is_usable:
         return InsufficientData(
@@ -302,6 +339,7 @@ def detect(
         severity=_severity(deviation),
         percent_change=stored_change,
         explanation=explain(
+            metric=metric,
             label=label,
             observed=observed,
             baseline_median=baseline.median,

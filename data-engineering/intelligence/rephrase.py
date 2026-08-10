@@ -81,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
             if kind not in ("SPIKE", "DROP"):
                 continue
             rebuilt = explain(
+                metric=metric,
                 label=METRIC_LABELS.get(metric, metric),
                 observed=float(observed),
                 baseline_median=float(baseline),
