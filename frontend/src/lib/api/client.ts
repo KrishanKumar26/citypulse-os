@@ -99,6 +99,15 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * How long any single request may take before it is treated as failed.
+ *
+ * Two minutes, which is long for an API and right for this deployment: the
+ * backend sleeps on a free tier and a cold start was measured at 104 seconds.
+ * A shorter ceiling would abandon requests that were about to succeed.
+ */
+const REQUEST_TIMEOUT_MS = 120_000;
+
 async function rawRequest(path: string, options: RequestOptions): Promise<Response> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (options.body !== undefined) {
@@ -108,14 +117,32 @@ async function rawRequest(path: string, options: RequestOptions): Promise<Respon
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  // A request with no deadline is a spinner with no end. Nothing here set one,
+  // so a sign-in against a sleeping free-tier backend simply span until the
+  // browser's own limit — around five minutes — with the form saying nothing.
+  //
+  // The ceiling is generous on purpose: a cold start on this deployment was
+  // measured at 104 seconds, so a short timeout would fail a request that was
+  // going to succeed. The form tells the reader what is happening long before
+  // this fires; this is the backstop, not the message.
+  const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, deadline])
+    : deadline;
+
   try {
     return await fetch(`${API_BASE_URL}${path}`, {
       method: options.method ?? "GET",
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-      signal: options.signal,
+      signal,
     });
   } catch (cause) {
+    // A timeout is a network condition, not a caller decision, so it must not
+    // be mistaken for a deliberate abort below.
+    if (cause instanceof DOMException && cause.name === "TimeoutError") {
+      throw new NetworkError(cause);
+    }
     // An aborted request is a caller decision, not a network fault.
     if (cause instanceof DOMException && cause.name === "AbortError") throw cause;
     throw new NetworkError(cause);

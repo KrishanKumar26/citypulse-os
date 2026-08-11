@@ -25,6 +25,15 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * Set once a sign-in has been waiting long enough to need explaining.
+   *
+   * The backend sleeps after fifteen minutes idle and a cold start was measured
+   * at 104 seconds. Nothing said so, so the first sign-in after a quiet spell
+   * was an unexplained spinner for a minute and a half — which reads as broken,
+   * not as slow.
+   */
+  const [waking, setWaking] = useState(false);
 
   const sessionExpired = searchParams.get("reason") === "expired";
   const justRegistered = searchParams.get("registered") === "1";
@@ -34,6 +43,10 @@ function LoginForm() {
     setError(null);
     setFieldErrors({});
     setSubmitting(true);
+    setWaking(false);
+    // Four seconds is past a warm sign-in, which measures about two, so this
+    // only appears when something is actually wrong with the timing.
+    const explainTheWait = setTimeout(() => setWaking(true), 4000);
 
     try {
       await signIn(email, password);
@@ -50,6 +63,9 @@ function LoginForm() {
         setError("Sign-in failed. Please try again.");
       }
       setSubmitting(false);
+    } finally {
+      clearTimeout(explainTheWait);
+      setWaking(false);
     }
   }
 
@@ -112,6 +128,15 @@ function LoginForm() {
         <Button type="submit" loading={submitting} fullWidth size="lg">
           {submitting ? "Signing in" : "Sign in"}
         </Button>
+
+        {/* Says what the wait is. A spinner with no explanation reads as broken;
+            the same spinner with a reason reads as slow, which is what it is. */}
+        {waking && (
+          <p role="status" className="text-center text-[12px] text-content-tertiary">
+            Waking the server — it sleeps when idle on the free tier, and can
+            take about a minute.
+          </p>
+        )}
       </form>
 
       <p className="mt-6 text-center text-[13px] text-content-tertiary">
