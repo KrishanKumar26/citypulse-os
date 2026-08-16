@@ -311,6 +311,16 @@ def write_zone_metrics(connection: psycopg.Connection, windows: Sequence[dict]) 
             w.get("sample_count", 0), w.get("demo_data", True),
             w.get("aqi_source"),
             w.get("weather_source"),
+            w.get("traffic_source"),
+            # Always None out of the aggregator: a generated window describes
+            # the road as occupancy and has no speed ratio. Written anyway, and
+            # explicitly, because this statement also runs over windows a
+            # previous overlay converted to the speed form. Omitting it would
+            # leave that speed_ratio in place beside the occupancy restored on
+            # the line above — one row claiming both metrics, which V22 exists
+            # to prevent. The load runs before the overlay each hour, so the
+            # real value is rewritten seconds later.
+            w.get("speed_ratio"),
         )
         for w in windows
     ]
@@ -321,8 +331,10 @@ def write_zone_metrics(connection: psycopg.Connection, windows: Sequence[dict]) 
             (zone_id, window_start, window_end, vehicle_count, average_speed_kph,
              occupancy_ratio, congestion_level, aqi, aqi_category, temperature_c,
              precipitation_mm_h, weather_condition, active_incidents, active_events,
-             risk_score, risk_level, sample_count, demo_data, aqi_source, weather_source)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             risk_score, risk_level, sample_count, demo_data, aqi_source, weather_source,
+             traffic_source, speed_ratio)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s)
         ON CONFLICT (zone_id, window_start, window_end) DO UPDATE SET
             vehicle_count      = EXCLUDED.vehicle_count,
             average_speed_kph  = EXCLUDED.average_speed_kph,
@@ -341,6 +353,8 @@ def write_zone_metrics(connection: psycopg.Connection, windows: Sequence[dict]) 
             demo_data          = EXCLUDED.demo_data,
             aqi_source         = EXCLUDED.aqi_source,
             weather_source     = EXCLUDED.weather_source,
+            traffic_source     = EXCLUDED.traffic_source,
+            speed_ratio        = EXCLUDED.speed_ratio,
             computed_at        = now()
         """,
         rows,

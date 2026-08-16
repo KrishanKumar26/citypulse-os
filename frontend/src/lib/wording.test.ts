@@ -12,14 +12,19 @@ import { DATA_DISCLOSURE, DATA_DISCLOSURE_SHORT, describeRisk, TERMS } from "./w
  */
 describe("data disclosure", () => {
   it("does not describe a real feed as generated", () => {
-    // The exact failure that shipped. Both real feeds must appear on the real
-    // side of the sentence, and neither may be listed among the generated ones.
+    // The exact failure that shipped. Every real feed must appear on the real
+    // side of the sentence, and none may be listed among the generated ones.
+    //
+    // Road speeds joined air and weather here when TomTom's probe feed landed
+    // (migration V22). The long form says "air quality" and the short form
+    // shortens it to "air", so the assertion matches the word both share — the
+    // spec is that the feed is named, not that it is named at one length.
     for (const text of [DATA_DISCLOSURE, DATA_DISCLOSURE_SHORT]) {
       const [real, generated = ""] = text.split(/generated|the rest/i);
-      expect(real).toMatch(/air quality/i);
-      expect(real).toMatch(/weather/i);
-      expect(generated).not.toMatch(/air quality/i);
-      expect(generated).not.toMatch(/weather/i);
+      for (const feed of [/\bair\b/i, /weather/i, /road speeds/i]) {
+        expect(real).toMatch(feed);
+        expect(generated).not.toMatch(feed);
+      }
     }
   });
 
@@ -27,7 +32,13 @@ describe("data disclosure", () => {
     // The opposite failure: a disclosure that quietly stops disclosing. PRD §42
     // requires synthetic data to be labelled, and this sentence is where the
     // product says so in prose.
-    expect(DATA_DISCLOSURE).toMatch(/traffic/i);
+    //
+    // Named by what is still generated rather than by "traffic", which this
+    // asserted until traffic stopped being generated and the spec became a
+    // record of an old truth. Incidents and city events have no free real-time
+    // feed in these cities; if one ever arrives, this fails and is the right
+    // place to notice.
+    expect(DATA_DISCLOSURE).toMatch(/incidents/i);
     expect(DATA_DISCLOSURE).toMatch(/generated/i);
   });
 });

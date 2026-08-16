@@ -166,6 +166,18 @@ export interface ZoneCondition {
   averageSpeedKph: string | null;
   occupancyRatio: string | null;
   congestionLevel: ConditionLevel | null;
+  /**
+   * Current speed over free-flow speed. 1.0 is unimpeded, 0.5 is half speed.
+   *
+   * Never present alongside `occupancyRatio`, and the pair is the point. A
+   * generated window describes the road as fullness; a window a probe feed
+   * covers describes it as delay, because nothing counted the vehicles on it.
+   * Read whichever is present and read `trafficSource` to know which. Null here
+   * is not a quiet road — see migration V22.
+   */
+  speedRatio: string | null;
+  /** Where this traffic came from. Null when the window has no reading at all. */
+  trafficSource: AirProvenance | null;
 
   aqi: number | null;
   aqiCategory: string | null;

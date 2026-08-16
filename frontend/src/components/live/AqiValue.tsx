@@ -47,3 +47,63 @@ export function AqiValue({
     </span>
   );
 }
+
+/**
+ * How loaded a road is, in whichever of the two ways it was actually measured.
+ *
+ * This column cannot be one number. A generated window knows how full the road
+ * is; a window covered by a probe feed knows how fast it is moving and never
+ * how full, because nothing counted the vehicles on it. Migration V22 records
+ * why the conversion between them was measured and rejected.
+ *
+ * So the unit is written out — "full" against "of free flow" — rather than
+ * both arriving as a bare percentage under one heading. Two meanings sharing a
+ * column and a `%` is how this codebase once put an occupancy of 1.62 on screen
+ * as "162% of capacity" beside a sentence calling it 1.62, and a reader
+ * comparing two rows here would have no way to tell which question each answered.
+ *
+ * Null is "no reading", not zero, and says so in words for the same reason the
+ * condition column does.
+ */
+export function TrafficValue({
+  occupancy,
+  speedRatio,
+  source,
+}: {
+  /** Share of road capacity in use, 0–1. Generated windows only. */
+  occupancy: number | null;
+  /** Current speed over free flow, 0–1. Real feeds only. */
+  speedRatio: number | null;
+  source: AirProvenance | null;
+}) {
+  // Occupancy first: it is the platform's native measure, and a row carrying
+  // both is a writer's bug worth showing consistently rather than at random.
+  const shown =
+    occupancy !== null
+      ? { value: Math.round(occupancy * 100), unit: "full" }
+      : speedRatio !== null
+        ? { value: Math.round(speedRatio * 100), unit: "of free flow" }
+        : null;
+
+  if (shown === null) {
+    return <span className="text-[11px] text-content-disabled">No reading</span>;
+  }
+
+  return (
+    <span className="text-content-secondary">
+      {shown.value}%{" "}
+      <span className="text-[10px] text-content-tertiary">{shown.unit}</span>
+      {source && (
+        <span
+          title={provenanceTooltip(source)}
+          className={cn(
+            "ml-1 text-[10px] uppercase",
+            source === "SYNTHETIC" ? "text-status-moderate" : "text-content-tertiary",
+          )}
+        >
+          {PROVENANCE_MARK[source]}
+        </span>
+      )}
+    </span>
+  );
+}

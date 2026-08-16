@@ -61,6 +61,33 @@ public class ZoneMetric {
     @Column(name = "congestion_level")
     private String congestionLevel;
 
+    /**
+     * Current speed over free-flow speed, from a real feed. 1.0 is unimpeded,
+     * 0.5 is half speed.
+     *
+     * <p>Never present alongside {@code occupancyRatio}, and the pair is the
+     * point. A generated window describes the road as fullness; a window a probe
+     * feed covers describes it as delay, because nothing counted the vehicles
+     * on it. The platform's own BPR relationship can turn one into the other and
+     * the inversion is exact, but measured against real readings it put 29% of
+     * free-flowing roads at "empty" and moved half its range on one km/h of
+     * rounding. Migration V22 carries the numbers.
+     *
+     * <p>So a consumer reads whichever of the two is present and reads
+     * {@code trafficSource} to know which it is getting. Null here is not a
+     * quiet road.
+     */
+    @Column(name = "speed_ratio")
+    private BigDecimal speedRatio;
+
+    /**
+     * Where this window's traffic came from: {@code MEASURED} (vehicle probes),
+     * {@code MODELLED} (a traffic model of a real road) or {@code SYNTHETIC}
+     * (generated). Null when the window has no traffic reading at all.
+     */
+    @Column(name = "traffic_source")
+    private String trafficSource;
+
     // --- Air quality ---------------------------------------------------------
 
     @Column(name = "aqi")

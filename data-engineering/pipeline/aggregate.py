@@ -213,6 +213,13 @@ def aggregate(
             "risk_level": risk_level(score),
             "sample_count": len(traffic_rows) + len(air_rows) + len(weather_rows),
             "aqi_source": aqi_source,
+            # Traffic on this path is always the generator's — a real feed is
+            # written straight to `traffic_events` and applied by
+            # `pipeline.provenance`, never batched through here. Stated from the
+            # readings anyway rather than hardcoded SYNTHETIC, for the same
+            # reason `demo_data` below is: a constant is correct only until it
+            # is not, and nothing announces when that day arrives.
+            "traffic_source": _provenance(traffic_rows[0]) if traffic_rows else None,
             # Weather arrives per city and is attached to every zone in it, so
             # its provenance is whatever the contributing readings carried —
             # the same rule as the air, one field over.

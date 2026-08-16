@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Badge, Card, CardHeader, EmptyState, Input, LoadingState, cn } from "@/components/ui";
 import { TrendBadge } from "@/components/charts/Sparkline";
 import type { AirProvenance, ConditionLevel, Zone, ZoneCondition } from "@/lib/api/types";
-import { AqiValue } from "@/components/live/AqiValue";
+import { AqiValue, TrafficValue } from "@/components/live/AqiValue";
 
 /**
  * Every zone's current condition, sortable and filterable.
@@ -54,6 +54,9 @@ interface Row {
   condition: ZoneCondition | undefined;
   risk: number | null;
   occupancy: number | null;
+  /** Current speed over free flow. Present instead of occupancy, never with it. */
+  speedRatio: number | null;
+  trafficSource: AirProvenance | null;
   speed: number | null;
   aqi: number | null;
   aqiSource: AirProvenance | null;
@@ -89,7 +92,12 @@ export function ZoneTable({
           zone,
           condition: c,
           risk: has && c?.riskScore != null ? Number(c.riskScore) : null,
-          occupancy: has && c?.occupancyRatio != null ? Number(c.occupancyRatio) * 100 : null,
+          occupancy: has && c?.occupancyRatio != null ? Number(c.occupancyRatio) : null,
+          speedRatio: has && c?.speedRatio != null ? Number(c.speedRatio) : null,
+          trafficSource:
+            has && (c?.occupancyRatio != null || c?.speedRatio != null)
+              ? (c?.trafficSource ?? null)
+              : null,
           speed: has && c?.averageSpeedKph != null ? Number(c.averageSpeedKph) : null,
           aqi: has && c?.aqi != null ? c.aqi : null,
           aqiSource: has && c?.aqi != null ? (c.aqiSource ?? null) : null,
@@ -120,7 +128,13 @@ export function ZoneTable({
       switch (sort.key) {
         case "name": return r.zone.name.toLowerCase();
         case "risk": return r.risk;
-        case "occupancy": return r.occupancy;
+        // Inverted for the speed form: 0.5 of free flow is a worse road than
+        // 0.9, while 0.5 of capacity is a better one than 0.9. Sorting the raw
+        // numbers together would interleave the two feeds backwards.
+        case "occupancy":
+          return r.occupancy !== null
+            ? r.occupancy
+            : r.speedRatio !== null ? 1 - r.speedRatio : null;
         case "speed": return r.speed;
         case "aqi": return r.aqi;
         case "incidents": return r.incidents;
@@ -208,7 +222,7 @@ export function ZoneTable({
               <tr className="border-b border-line-subtle text-[11px] text-content-tertiary">
                 <SortableHeader label="Zone" col="name" sort={sort} setSort={setSort} align="left" />
                 <th scope="col" className="px-4 py-2.5 font-medium">Condition</th>
-                <SortableHeader label="Road capacity in use" col="occupancy" sort={sort} setSort={setSort} />
+                <SortableHeader label="Road load" col="occupancy" sort={sort} setSort={setSort} />
                 <SortableHeader label="Speed" col="speed" sort={sort} setSort={setSort} />
                 <SortableHeader label="AQI" col="aqi" sort={sort} setSort={setSort} />
                 <SortableHeader label="Incidents" col="incidents" sort={sort} setSort={setSort} />
@@ -243,7 +257,13 @@ export function ZoneTable({
                         <span className="text-[11px] text-content-disabled">No reading</span>
                       )}
                     </td>
-                    <Cell value={r.occupancy} suffix="%" decimals={0} />
+                    <td className="px-4 py-2.5 text-right tabular">
+                      <TrafficValue
+                        occupancy={r.occupancy}
+                        speedRatio={r.speedRatio}
+                        source={r.trafficSource}
+                      />
+                    </td>
                     <Cell value={r.speed} suffix=" km/h" decimals={1} />
                     <td className="px-4 py-2.5 text-right tabular">
                       <AqiValue aqi={r.aqi} source={r.aqiSource} />

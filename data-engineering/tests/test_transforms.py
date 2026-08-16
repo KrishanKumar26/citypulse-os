@@ -13,7 +13,10 @@ import pytest
 
 from common.events import OCCUPANCY_PRECISION, AqiCategory, CongestionLevel
 from common.transforms import (
+    _SPEED_RATIO_SATURATION,
+    _speed_ratio_at,
     aqi_category,
+    congestion_from_speed_ratio,
     congestion_level,
     risk_level,
     risk_score,
@@ -239,3 +242,67 @@ class TestWindowStart:
     def test_rejects_non_positive_window(self) -> None:
         with pytest.raises(ValueError):
             window_start(datetime.now(timezone.utc), timedelta(0))
+
+
+class TestCongestionFromSpeedRatio:
+    """The band has to mean one thing whichever feed described the road.
+
+    A zone covered by TomTom reports speed; a generated one reports fullness.
+    If MODERATE meant different conditions on each, the map legend would be a
+    lie and no operator could compare two zones side by side.
+    """
+
+    @pytest.mark.parametrize("occupancy", [0.0, 0.3, 0.55, 0.56, 0.8, 0.81, 1.0, 1.01, 1.4, 2.0])
+    def test_it_agrees_with_the_occupancy_bands_it_was_derived_from(self, occupancy) -> None:
+        implied = _speed_ratio_at(occupancy)
+        assert str(congestion_from_speed_ratio(implied)) == str(congestion_level(occupancy))
+
+    def test_free_flow_is_normal(self) -> None:
+        assert str(congestion_from_speed_ratio(1.0)) == "NORMAL"
+
+    def test_a_standstill_is_critical(self) -> None:
+        assert str(congestion_from_speed_ratio(0.0)) == "CRITICAL"
+
+    def test_faster_than_free_flow_is_still_normal(self) -> None:
+        # TomTom does report this on a quiet motorway. It is not congestion.
+        assert str(congestion_from_speed_ratio(1.2)) == "NORMAL"
+
+
+class TestRiskFromSpeedRatio:
+    def test_the_two_congestion_inputs_agree_at_free_flow(self) -> None:
+        other = dict(aqi=None, active_incidents=0, precipitation_mm_h=None)
+        assert (risk_score(occupancy_ratio=0.0, **other)
+                == risk_score(occupancy_ratio=None, speed_ratio=1.0, **other))
+
+    def test_the_two_congestion_inputs_agree_at_saturation(self) -> None:
+        other = dict(aqi=None, active_incidents=0, precipitation_mm_h=None)
+        assert (risk_score(occupancy_ratio=1.25, **other)
+                == risk_score(occupancy_ratio=None,
+                              speed_ratio=_SPEED_RATIO_SATURATION, **other))
+
+    def test_slower_is_riskier(self) -> None:
+        other = dict(aqi=None, active_incidents=0, precipitation_mm_h=None)
+        scores = [risk_score(occupancy_ratio=None, speed_ratio=r, **other)
+                  for r in (1.0, 0.8, 0.6, 0.4, 0.2)]
+        assert scores == sorted(scores)
+
+    def test_beyond_saturation_the_contribution_stops_growing(self) -> None:
+        other = dict(aqi=None, active_incidents=0, precipitation_mm_h=None)
+        assert (risk_score(occupancy_ratio=None, speed_ratio=0.1, **other)
+                == risk_score(occupancy_ratio=None, speed_ratio=0.0, **other))
+
+    def test_occupancy_wins_when_a_row_somehow_carries_both(self) -> None:
+        # V22 makes this row impossible, and it is still worth pinning: if one
+        # ever appears it is a writer's bug, and averaging the two would hide it
+        # behind a number that looks reasonable.
+        other = dict(aqi=None, active_incidents=0, precipitation_mm_h=None)
+        assert (risk_score(occupancy_ratio=1.25, speed_ratio=1.0, **other)
+                == risk_score(occupancy_ratio=1.25, **other))
+
+    def test_a_zone_with_neither_is_not_scored_on_congestion(self) -> None:
+        # Absent, not zero: an unmeasured road is unknown, not empty.
+        with_speed = risk_score(occupancy_ratio=None, speed_ratio=1.0,
+                                aqi=400, active_incidents=0, precipitation_mm_h=None)
+        without = risk_score(occupancy_ratio=None, speed_ratio=None,
+                             aqi=400, active_incidents=0, precipitation_mm_h=None)
+        assert without > with_speed

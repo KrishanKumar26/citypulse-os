@@ -220,6 +220,7 @@ public class LiveMetricsService {
                 metric.getWindowStart(), metric.getWindowEnd(),
                 metric.getVehicleCount(), metric.getAverageSpeedKph(), metric.getOccupancyRatio(),
                 metric.getCongestionLevel(),
+                metric.getSpeedRatio(), metric.getTrafficSource(),
                 metric.getAqi(), metric.getAqiCategory(), metric.getAqiSource(),
                 metric.getTemperatureC(), metric.getPrecipitationMmH(), metric.getWeatherCondition(),
                 metric.getWeatherSource(),

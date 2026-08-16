@@ -122,8 +122,9 @@ export const NO_READING = "No reading";
  * feed is then one edit, not five and a search.
  */
 export const DATA_DISCLOSURE =
-  "Air quality and weather are real. Traffic, incidents and city events are " +
-  "generated, and say so wherever they appear.";
+  "Air quality, weather and road speeds are real where a feed reaches. " +
+  "Incidents and city events are generated. Every figure says which it is.";
 
 /** The same fact where there is room for one line. */
-export const DATA_DISCLOSURE_SHORT = "Air quality and weather are real; the rest is generated.";
+export const DATA_DISCLOSURE_SHORT =
+  "Air, weather and road speeds are real where covered; the rest is generated.";

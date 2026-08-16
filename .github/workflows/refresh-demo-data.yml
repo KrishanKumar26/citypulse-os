@@ -191,6 +191,32 @@ jobs:
           CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
         run: python -m ingest.weather
 
+      - name: Ingest measured traffic from vehicle probes
+        # Last of the four overlays and still before detection, for the same
+        # reason as the others: the detector reads zone_metrics, and running it
+        # first would measure the generated road and then have the real speed
+        # arrive underneath it.
+        #
+        # This one repoints the heaviest signal on the page. Congestion is the
+        # largest term in risk_score and the metric every anomaly, forecast and
+        # alert is built on, so a window it claims changes what the whole screen
+        # says — see V22 for why that window stops reporting occupancy at all.
+        #
+        # Not gated on the key: the module reports what it did and writes
+        # nothing without one, so a fork with no TOMTOM_API_KEY gets a clear
+        # line in the log rather than a step that looks like it ran.
+        #
+        # 62 requests an hour is 1,488 a day against TomTom's free allowance of
+        # 2,500 non-tile requests. That fits, and it is most of the room: a
+        # second per-zone feed on this schedule would not.
+        if: steps.check.outputs.configured == 'true'
+        continue-on-error: true
+        working-directory: data-engineering
+        env:
+          CITYPULSE_PG_DSN: ${{ secrets.HOSTED_PG_DSN }}
+          TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+        run: python -m ingest.tomtom
+
       - name: Issue forecasts and detect anomalies
         if: steps.check.outputs.configured == 'true'
         working-directory: data-engineering

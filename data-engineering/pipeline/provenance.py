@@ -6,11 +6,10 @@ and Open-Meteo are fetched on their own schedule and written straight to
 `air_quality_events` and `weather_events`, so the curated windows covering them
 were already built, from generated readings, before the real ones arrived.
 
-Two signals now, air and weather, and both follow the rules below. Traffic,
-incidents and city events have no real feed to overlay and are not handled
-here. Written to the raw table
-and left there, a real reading is something nothing reads — the dashboard reads
-`zone_metrics`.
+Three signals now — air, weather and traffic — and all three follow the rules
+below. Incidents and city events have no real feed to overlay and are not
+handled here. Written to the raw table and left there, a real reading is
+something nothing reads — the dashboard reads `zone_metrics`.
 
 **Three provenances, ranked, never mixed.** An instrument beats a model and a
 model beats the generator, and only the winning tier contributes to the number.
@@ -45,7 +44,8 @@ from datetime import datetime, timedelta
 import psycopg
 from psycopg.rows import tuple_row
 
-from common.transforms import aqi_category, risk_level, risk_score
+from common.transforms import (aqi_category, congestion_from_speed_ratio, risk_level,
+                               risk_score)
 
 #: The vocabulary, so callers reporting on a run name the same three states this
 #: writes rather than repeating the strings.
@@ -57,6 +57,21 @@ SYNTHETIC = "SYNTHETIC"
 #: publish hourly, so an hour covers the gap between readings without a window
 #: ever being coloured by a feed that has gone quiet.
 DEFAULT_CARRY = timedelta(hours=1)
+
+#: How long one speed reading speaks for, which is not an hour.
+#:
+#: Air and weather publish hourly and change slowly, so a reading that stands in
+#: for the following hour is describing conditions that genuinely persisted.
+#: Traffic does not behave that way: the probe watched a Bengaluru zone fall from
+#: free flow to 0.529 of it in eight minutes. Carrying a speed for an hour would
+#: paint a whole hour of windows with a road that had already cleared, and the
+#: dashboard would report a jam that ended forty minutes ago.
+#:
+#: Fifteen minutes is what a single reading can honestly cover. With an hourly
+#: job that leaves most windows in an hour still generated, which is the true
+#: state and one this platform has a word for. Sampling often enough to cover
+#: them all would cost 5,952 requests a day against a free allowance of 2,500.
+TRAFFIC_CARRY = timedelta(minutes=15)
 
 
 def overlay(
@@ -251,6 +266,135 @@ def overlay_weather(
                    risk_score         = %s,
                    risk_level         = %s,
                    computed_at        = now()
+             WHERE zone_id = %s AND window_start = %s
+            """,
+            updates,
+        )
+    connection.commit()
+    return counts
+
+
+def overlay_traffic(
+    connection: psycopg.Connection,
+    *,
+    since: datetime | None = None,
+    carry: timedelta = TRAFFIC_CARRY,
+) -> dict[str, int]:
+    """The same rewrite for traffic, which replaces the metric rather than the number.
+
+    Air and weather overlay like for like: a real AQI displaces a generated AQI
+    in the same column, on the same scale. Traffic cannot. A probe feed reports
+    how fast a segment is moving against its own free flow; the generator reports
+    how full the road is. Both describe congestion and neither can produce the
+    other without inventing something — the arithmetic was tried, measured
+    against 124 real readings and rejected, and V22 records why.
+
+    So a window this claims stops describing itself as fullness and starts
+    describing itself as speed. `speed_ratio` and `average_speed_kph` become
+    real, and **`occupancy_ratio` and `vehicle_count` are set to NULL** — the
+    platform's word for "nothing measured this", which is the truth about a
+    vehicle count on a road only observed through speed. Leaving the generated
+    occupancy in place beside a real speed would put two congestion figures on
+    one row with nothing to say which was meant, and this repository has already
+    shipped that bug once with a ratio and a percentage.
+
+    `congestion_level` survives the switch because it is the platform's shared
+    severity vocabulary rather than a band of occupancy, and
+    `congestion_from_speed_ratio` anchors its boundaries to the occupancy ones so
+    the word means one thing on either feed.
+
+    Risk moves with the traffic, as it must: congestion is the heaviest term in
+    `risk_score`, and repointing the measurement without recomputing would leave
+    a window whose displayed traffic and displayed risk disagree about the road.
+
+    Returns a count per provenance written. Idempotent.
+    """
+    floor = None if since is None else since - carry
+
+    with connection.cursor(row_factory=tuple_row) as cursor:
+        cursor.execute(
+            """
+            WITH real_traffic AS (
+                SELECT te.zone_id, te.event_time, te.speed_ratio,
+                       te.average_speed_kph, ds.provenance,
+                       CASE ds.provenance WHEN 'MEASURED' THEN 1 ELSE 2 END AS tier
+                  FROM traffic_events te
+                  JOIN data_sources ds ON ds.id = te.source_id
+                 WHERE ds.provenance IN ('MEASURED', 'MODELLED')
+                   AND te.speed_ratio IS NOT NULL
+                   AND (%(floor)s::timestamptz IS NULL
+                        OR te.event_time >= %(floor)s::timestamptz)
+            )
+            SELECT zm.zone_id, zm.window_start, c.speed_ratio, c.average_speed_kph,
+                   c.provenance, zm.aqi, zm.active_incidents, zm.precipitation_mm_h
+              FROM zone_metrics zm
+              JOIN LATERAL (
+                  -- Best tier covering this window, then the most recent moment
+                  -- within it. Averaged across whatever reported at that moment,
+                  -- matching how the air overlay folds two stations into one
+                  -- number for a zone.
+                  SELECT r.provenance,
+                         avg(r.speed_ratio)       AS speed_ratio,
+                         avg(r.average_speed_kph) AS average_speed_kph
+                    FROM real_traffic r
+                   WHERE r.zone_id = zm.zone_id
+                     AND r.event_time <  zm.window_end
+                     AND r.event_time >= zm.window_end - %(carry)s::interval
+                   GROUP BY r.tier, r.provenance, r.event_time
+                   ORDER BY r.tier, r.event_time DESC
+                   LIMIT 1
+              ) c ON TRUE
+             WHERE (%(since)s::timestamptz IS NULL
+                    OR zm.window_start >= %(since)s::timestamptz)
+               AND (zm.speed_ratio     IS DISTINCT FROM round(c.speed_ratio, 4)
+                 OR zm.traffic_source  IS DISTINCT FROM c.provenance
+                 -- A window already reporting this speed but still carrying the
+                 -- generator's vehicle count has not finished switching metric.
+                 -- Without this it would never be revisited.
+                 OR zm.occupancy_ratio IS NOT NULL
+                 OR zm.vehicle_count   IS NOT NULL)
+            """,
+            {"floor": floor, "since": since, "carry": carry},
+        )
+        targets = cursor.fetchall()
+
+    if not targets:
+        return {}
+
+    counts: dict[str, int] = {}
+    updates = []
+    for (zone_id, window_start, speed_ratio, average_speed, provenance,
+         aqi, incidents, precipitation) in targets:
+        ratio = round(float(speed_ratio), 4)
+        score = risk_score(
+            occupancy_ratio=None,
+            speed_ratio=ratio,
+            aqi=aqi,
+            active_incidents=incidents,
+            precipitation_mm_h=float(precipitation) if precipitation is not None else None,
+        )
+        counts[provenance] = counts.get(provenance, 0) + 1
+        updates.append((
+            ratio, round(float(average_speed), 2),
+            str(congestion_from_speed_ratio(ratio)), provenance,
+            score, risk_level(score), zone_id, window_start,
+        ))
+
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            UPDATE zone_metrics
+               SET speed_ratio       = %s,
+                   average_speed_kph = %s,
+                   congestion_level  = %s,
+                   traffic_source    = %s,
+                   risk_score        = %s,
+                   risk_level        = %s,
+                   -- Nothing counted the vehicles on this road. NULL is the
+                   -- platform's word for that and it is not the same as zero.
+                   occupancy_ratio   = NULL,
+                   vehicle_count     = NULL,
+                   computed_at       = now()
              WHERE zone_id = %s AND window_start = %s
             """,
             updates,
