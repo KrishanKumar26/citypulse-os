@@ -133,8 +133,15 @@ def _by_size_ascending(connection: psycopg.Connection) -> list[tuple[str, int]]:
     the original. Starting with the smallest means each rewrite frees its own
     space and enlarges the room available to the next, which matters when the
     reason for running this at all is that there is almost none.
+
+    Every table this deletes from, `zone_metrics` included. It was left out of
+    this list when curated retention was added, and the run that followed
+    deleted 61,080 rows and reported the table at 264 MB before and after: a
+    DELETE only marks tuples dead, and the storage ceiling counts pages, not
+    live rows. The whole prune freed one megabyte and the database stayed full.
+    A table pruned but never rewritten is a table pruned for nothing.
     """
-    names = [name for name, _ in EVENT_TABLES + FORECAST_TABLES]
+    names = [name for name, _ in EVENT_TABLES + FORECAST_TABLES + CURATED_TABLES]
     with connection.cursor(row_factory=tuple_row) as cursor:
         cursor.execute(
             """
@@ -251,7 +258,27 @@ def main(argv: list[str] | None = None) -> int:
         with connection.cursor() as cursor:
             for table, _ in _by_size_ascending(connection):
                 print(f"    rewriting {table}")
-                cursor.execute(f"VACUUM (FULL, ANALYZE) {table}")  # noqa: S608
+                try:
+                    cursor.execute(f"VACUUM (FULL, ANALYZE) {table}")  # noqa: S608
+                except psycopg.errors.DiskFull:
+                    # The rewrite needs the survivors' worth of free space and
+                    # the ceiling is the reason this is running. A big table on
+                    # a nearly full database cannot be rewritten at all, and
+                    # letting that end the prune leaves every later table
+                    # untouched too.
+                    #
+                    # Plain VACUUM returns nothing to the ceiling, which is why
+                    # FULL is preferred and why an earlier outage was not fixed
+                    # by it. It does something else that matters more here: the
+                    # dead pages become reusable by this table, so the next
+                    # hourly insert fills a hole instead of extending the file.
+                    # DiskFull is raised on extension, so writes start working
+                    # again even though the reported size does not move.
+                    print(f"      no room to rewrite {table}; plain VACUUM "
+                          f"instead — its dead space becomes reusable, so "
+                          f"writes stop failing, but the reported size will "
+                          f"not fall until a run has room")
+                    cursor.execute(f"VACUUM (ANALYZE) {table}")  # noqa: S608
         connection.autocommit = False
 
         print("\nafter:")
