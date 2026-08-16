@@ -132,7 +132,13 @@ its own merit, and is documented as such.
 - **Synthetic feeds stay.** PRD §43 requires the platform to run with no external
   API. Removing them empties fourteen modules. The honesty is in the labelling,
   not in the absence.
-- **`zone_metrics` is never pruned.** See `CONTEXT.md` §4.
+- **`zone_metrics` is pruned at thirty days, and the number is derived.** It was
+  never pruned until the database filled a second time on 16 August 2026. The
+  old rule was right that thinning it starves the detector and wrong never to
+  ask by how much: the floor is twelve samples in an hour-of-week bucket, a week
+  supplies exactly twelve, so a month is four times the floor. See
+  `CONTEXT.md` §4. **Lesson: an exemption defended on a danger nobody quantified
+  is a guess wearing a rule's clothes.**
 - **Two registers of language.** Operator and citizen screens use plain words;
   Data Health, Data Sources, API Management, Architecture and Security keep
   their technical vocabulary. Simplifying those would remove what their reader
@@ -153,6 +159,8 @@ its own merit, and is documented as such.
 |---|---|
 | WAQI token is rejected — the stored value is 79 chars, aqicn.org issues 32-char hex | user |
 | `hosted-check@citypulse.local` still active in production (suspend via `PATCH /api/v1/users/{id}/status`; there is no delete endpoint) | user |
-| Database will fill again in ~1 month | decision needed |
+| Database filled 16 Aug 2026; `zone_metrics` now kept 30 days | done |
+| Traffic is real for 60 of 62 zones via TomTom; 2 snap too far or report too little confidence | done |
+| Whether the zones reporting exactly free-flow are genuinely uncovered — `scripts/probe_tomtom_variance.py` answers it, and the production feed will too after a week of `traffic_source` | open |
 | Phase 9: performance and accessibility unmeasured | open |
 | Two dead tracked files (`SignalFlow.tsx`, `air_provenance.py`) | cleanup |

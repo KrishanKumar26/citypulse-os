@@ -65,9 +65,21 @@ window — which is what every screen reads, what baselines are learned from and
 what forecasts are scored against. `anomalies`, `forecasts`, `alerts`,
 `zone_baselines`, `forecast_accuracy` and `interventions` hang off that.
 
-**`zone_metrics` is the platform's memory. Do not prune it.** The baseline query
-has no lower time bound; thinning it makes the detector quietly start declining
-windows for insufficient history.
+**`zone_metrics` is the platform's memory, and it is kept for thirty days.** It
+was exempt from retention entirely until 16 August 2026, when it reached 263 MB
+of a 489 MB database and the deployment stopped accepting writes with every
+other table already pruned.
+
+Thirty days is derived, not guessed. `intelligence/detection.py` buckets
+baselines by hour of week — 168 buckets — and requires
+`MIN_BASELINE_SAMPLES = 12`. A bucket collects one hour per week, which at
+five-minute windows is exactly twelve samples, so **one week is the floor** and a
+month leaves four times it. `pipeline/prune.py` refuses `--curated-days` under
+seven rather than warning, because below it the detector stops judging windows
+and the map simply looks calm.
+
+What this costs is history no baseline reads: charts and the accuracy screen
+cannot look back beyond a month.
 
 ## 5. Which data is real
 
@@ -175,10 +187,12 @@ because it is the step that frees the space the load needs.
   measured or documented. Everything else in the roadmap is complete.
 - **Confidence is not the issue here** — this project has no missing scoring
   spec. Forecast confidence is computed from measured error on held-out data.
-- **The database will fill again.** It sits at ~399 MB of Neon's 512 MB ceiling
-  and `zone_metrics` grows about 3.5 MB a day. Roughly a month of headroom.
-  Options: pay for Neon, add a 90-day retention on `zone_metrics` (baselines
-  need weeks, not months), or accept a periodic manual prune.
+- **The database filled, and the retention answer is now in place.** It reached
+  Neon's 512 MB ceiling on 16 August 2026 — five days after being measured at
+  399 MB, not the month that was predicted, because the refresh writes three
+  hours of telemetry every hour. `zone_metrics` now carries a thirty-day
+  retention (see §4). If it fills again the remaining options are unchanged:
+  pay for Neon, or shorten retention toward the seven-day floor.
 - **Cold start.** Render's free tier suspends the container after fifteen
   minutes idle; waking it has been measured at 63–104 seconds. The login form
   explains this after four seconds of waiting. It is not a fault.

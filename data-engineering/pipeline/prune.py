@@ -9,14 +9,20 @@ it is not: a free-tier Postgres has a storage ceiling, and reaching it does not
 degrade gracefully. Reads keep working and every write fails, so the dashboard
 looks healthy while nobody can sign in — which is exactly how it presented.
 
-**The curated windows are kept.** `zone_metrics` is what every screen reads,
-what the baselines are learned from and what the forecasts are scored against;
-it is small, one row per zone per five minutes. What grows without bound is the
-raw event tables behind it, and those have already done their job once the
-window they belong to is built. Three days of them is enough to rebuild recent history and to show the lake
-layer is real. Thirty was the first guess and it freed almost nothing: the
-refresh writes three hours of events every hour, so the raw tables grow at three
-times real time and everything in them is days old, not months.
+**The raw event tables go first**, because they have already done their job once
+the window they belong to is built. Three days of them is enough to rebuild
+recent history and to show the lake layer is real. Thirty was the first guess and
+it freed almost nothing: the refresh writes three hours of events every hour, so
+the raw tables grow at three times real time and everything in them is days old,
+not months.
+
+**The curated windows are kept for thirty days**, which is a change. They were
+exempt entirely on the grounds that `zone_metrics` is the platform's memory, and
+that held until it was 263 MB of a 489 MB database and the deployment stopped
+accepting writes with everything else already pruned. Thirty days is not a guess
+either: the detector needs twelve samples in an hour-of-week bucket and a week
+supplies exactly twelve, so a month leaves four times the floor. See
+CURATED_TABLES below for the arithmetic and for what it costs.
 
 `--report` is the default posture: it prints the sizes and touches nothing, so
 the decision to delete is always made against a measurement.
@@ -33,6 +39,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import psycopg  # noqa: E402
 from psycopg.rows import tuple_row  # noqa: E402
+
+# Imported rather than restated. The retention below is derived from this
+# number, and a copy of it here would let the detector's floor move without the
+# retention that feeds it moving too.
+from intelligence.detection import MIN_BASELINE_SAMPLES  # noqa: E402
+
+#: A bucket is one hour of one weekday, and five-minute windows put twelve of
+#: them in a week. So this many days is the point at which a bucket holds
+#: exactly MIN_BASELINE_SAMPLES and the detector is one sample from declining.
+DAYS_PER_BASELINE_FLOOR = 7
 
 #: Raw event tables, oldest-first prunable. Curated and reference tables are
 #: deliberately absent: losing zone_metrics would lose every chart's history,
@@ -57,12 +73,31 @@ FORECAST_TABLES = (("forecasts", "issued_at"),)
 
 FORECAST_RETENTION_DAYS = 7
 
-#: `zone_metrics` is deliberately absent from both, and it is the largest table
-#: here at 221 MB. It is the platform's memory: every chart, every baseline and
-#: every anomaly comparison reads it, and the baseline query has no lower bound
-#: at all — cutting it would quietly thin the baselines until the detector
-#: started declining windows for insufficient history. Freeing space by
-#: forgetting what normal looks like is not a trade this product should make.
+#: The curated windows, and the reason this file used to say they were untouchable.
+#:
+#: `zone_metrics` was exempt for a good reason: it is the platform's memory, the
+#: baseline query has no lower bound, and thinning it would quietly starve the
+#: detector until it began declining windows for insufficient history. That
+#: reasoning was right about the danger and wrong about the number, because it
+#: never went and looked at what the detector actually requires.
+#:
+#: It requires twelve. `intelligence.detection` buckets by hour of week — 168
+#: buckets, because Tuesday 09:00 and Sunday 09:00 are not the same hour — and
+#: `MIN_BASELINE_SAMPLES` is 12. A bucket collects one hour per week, which at
+#: five-minute windows is twelve samples per week. So **one week is the floor
+#: exactly**, and thirty days holds roughly forty-eight per bucket: four times
+#: what a judgement needs, which is also the figure detection.py's own comment
+#: quotes for four weeks.
+#:
+#: What this does cost is history no baseline reads: charts and the accuracy
+#: screen can no longer look back beyond a month. That is a real loss and it is
+#: the one being chosen, against a database that stopped accepting writes at
+#: 484 MB of 512 with the prune already doing everything else it could — raw
+#: events at three days and forecasts at seven freed five megabytes, because
+#: `zone_metrics` was 263 MB of the total and untouchable by rule.
+CURATED_TABLES = (("zone_metrics", "window_start"),)
+
+CURATED_RETENTION_DAYS = 30
 
 DEFAULT_RETENTION_DAYS = 3
 
@@ -79,6 +114,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--days", type=int, default=DEFAULT_RETENTION_DAYS,
         help=f"Keep raw events newer than this many days (default {DEFAULT_RETENTION_DAYS}).",
+    )
+    parser.add_argument(
+        "--curated-days", type=int, default=CURATED_RETENTION_DAYS,
+        help=(f"Keep curated windows newer than this many days "
+              f"(default {CURATED_RETENTION_DAYS}). Below 7 the baselines fall "
+              f"under {MIN_BASELINE_SAMPLES} samples a bucket and the detector "
+              f"starts declining windows."),
     )
     return parser
 
@@ -163,6 +205,18 @@ def main(argv: list[str] | None = None) -> int:
         print("CITYPULSE_PG_DSN is required.")
         return 1
 
+    # Refused rather than warned about. Under a week every hour-of-week bucket
+    # falls below the detector's floor, and the failure is silent: anomalies
+    # simply stop being raised and the map looks calm. Freeing disk by making
+    # the product stop noticing things is the one trade it must not make, and
+    # the flag is easier to type than the outage is to diagnose.
+    if args.curated_days < DAYS_PER_BASELINE_FLOOR:
+        print(f"--curated-days {args.curated_days} would leave every hour-of-week "
+              f"bucket under {MIN_BASELINE_SAMPLES} samples, and the detector "
+              f"would quietly stop judging windows. {DAYS_PER_BASELINE_FLOOR} is "
+              f"the floor; {CURATED_RETENTION_DAYS} is the default.")
+        return 1
+
     with psycopg.connect(dsn) as connection:
         print("before:")
         report(connection)
@@ -175,6 +229,10 @@ def main(argv: list[str] | None = None) -> int:
         removed = prune(connection, days=args.days, tables=EVENT_TABLES)
         print(f"  dropping forecasts older than {FORECAST_RETENTION_DAYS} days:")
         removed += prune(connection, days=FORECAST_RETENTION_DAYS, tables=FORECAST_TABLES)
+        print(f"  dropping curated windows older than {args.curated_days} days "
+              f"(baselines need {MIN_BASELINE_SAMPLES} samples a bucket; a week "
+              f"supplies exactly that):")
+        removed += prune(connection, days=args.curated_days, tables=CURATED_TABLES)
         if not removed:
             print("    nothing was past retention")
 
