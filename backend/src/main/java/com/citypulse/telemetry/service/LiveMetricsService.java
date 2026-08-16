@@ -204,6 +204,10 @@ public class LiveMetricsService {
                     zone.getCenterLatitude(), zone.getCenterLongitude(),
                     null, null,
                     null, null, null, null,
+                    // speedRatio and trafficSource. Null here is the same
+                    // "nothing measured this zone" as every other null on this
+                    // branch, not a road reported as free-flowing.
+                    null, null,
                     null, null, null, null,
                     null, null, null,
                     0, 0,
