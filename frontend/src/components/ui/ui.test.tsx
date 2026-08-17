@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Badge, Button, DemoDataBadge, EmptyState, ErrorState, Input } from ".";
+import { DATA_DISCLOSURE } from "@/lib/wording";
 
 describe("Button", () => {
   it("calls its handler when clicked", async () => {
@@ -65,7 +66,25 @@ describe("DemoDataBadge", () => {
     // counts".
     render(<DemoDataBadge />);
     expect(screen.queryByText(/DEMO DATA/)).not.toBeInTheDocument();
-    expect(screen.getByTitle(/Air quality and weather are real/)).toBeInTheDocument();
+  });
+
+  it("takes its hover text from DATA_DISCLOSURE rather than a copy of it", () => {
+    // This badge held its own hand-written sentence and it went stale exactly
+    // as the five earlier copies did: it went on saying traffic was generated
+    // for as long as TomTom had been feeding it. Asserting the constant, not a
+    // phrase from it, is what makes the next feed's arrival a one-line change.
+    render(<DemoDataBadge />);
+    expect(screen.getByTitle(DATA_DISCLOSURE)).toBeInTheDocument();
+  });
+
+  it("never describes a real feed as generated", () => {
+    // The spec the stale copy failed. Whatever the sentence says, no feed with
+    // a real source may appear on the generated side of it.
+    const [real, generated = ""] = DATA_DISCLOSURE.split(/generated|the rest/i);
+    for (const feed of [/\bair\b/i, /weather/i, /road speeds/i]) {
+      expect(real).toMatch(feed);
+      expect(generated).not.toMatch(feed);
+    }
   });
 });
 
