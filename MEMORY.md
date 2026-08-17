@@ -163,4 +163,5 @@ its own merit, and is documented as such.
 | Traffic is real for 60 of 62 zones via TomTom; 2 snap too far or report too little confidence | done |
 | Whether the zones reporting exactly free-flow are genuinely uncovered — `scripts/probe_tomtom_variance.py` answers it, and the production feed will too after a week of `traffic_source` | open |
 | Phase 9: performance and accessibility unmeasured | open |
+| **Six places still read `occupancy_ratio` alone, which V22 made null on every zone a real feed covers.** `ZoneTable` was given `TrafficValue` and the rest were not, so a zone detail shows an empty traffic tile and a flat chart while the number sits in `speed_ratio` beside it. Not a crash and not wrong — the reading genuinely is absent from that column — but it reads as a dead feed. `live/page.tsx` 194 and 378 and `ZoneIntelligence.tsx` 134 need the existing component; `ZoneIntelligence.tsx` 84, `anomalies/page.tsx` 365 and `forecast/page.tsx` 52 are series and need `speedRatio` on `ZoneHistoryPoint` first, which is a backend change | open |
 | Two dead tracked files (`SignalFlow.tsx`, `air_provenance.py`) | cleanup |
