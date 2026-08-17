@@ -157,7 +157,7 @@ its own merit, and is documented as such.
 
 | Item | Owner |
 |---|---|
-| WAQI token is rejected — the stored value is 79 chars, aqicn.org issues 32-char hex | user |
+| WAQI token replaced 17 Aug 2026; 10 zones now report measured air. The stored value had been 79 chars — aqicn.org issues **40** hex chars, not the 32 this table used to claim, and that wrong number was never checked against a real token | done |
 | `hosted-check@citypulse.local` still active in production (suspend via `PATCH /api/v1/users/{id}/status`; there is no delete endpoint) | user |
 | Database filled 16 Aug 2026; `zone_metrics` now kept 30 days | done |
 | Traffic is real for 60 of 62 zones via TomTom; 2 snap too far or report too little confidence | done |

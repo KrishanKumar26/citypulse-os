@@ -89,11 +89,23 @@ This is the single most important thing to get right when changing copy.
 |---|---|---|
 | Air quality | Copernicus CAMS via Open-Meteo; CPCB stations via WAQI | `MODELLED` / `MEASURED` |
 | Weather | Open-Meteo forecast model | `MODELLED` |
-| Traffic | this repository's generator | `SYNTHETIC` |
+| Traffic | TomTom vehicle probes; this repository's generator where no road answers | `MEASURED` / `MODELLED` / `SYNTHETIC` |
 | Incidents | generator | `SYNTHETIC` |
 | City events | generator | `SYNTHETIC` |
 
-Traffic, incidents and events are generated because **no free real-time feed
+Measured on the deployment, 17 August 2026, newest window per zone:
+
+| Feed | Measured | Modelled | Synthetic |
+|---|---|---|---|
+| Traffic | 59 | 1 | 2 |
+| Air | 10 | 52 | 0 |
+| Weather | 0 | 62 | 0 |
+
+Traffic stopped being generated on 16 August 2026 — see migration V22, and note
+that a window carrying a real feed reports `speed_ratio` and has **no**
+`occupancy_ratio`, because nothing counted the vehicles on that road.
+
+Incidents and city events are still generated because **no free real-time feed
 exists for them in these cities**, and PRD §43 requires the platform to run with
 no external API at all. That is a design decision, not a gap.
 
