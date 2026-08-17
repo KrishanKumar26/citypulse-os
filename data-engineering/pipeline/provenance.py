@@ -73,6 +73,25 @@ DEFAULT_CARRY = timedelta(hours=1)
 #: them all would cost 5,952 requests a day against a free allowance of 2,500.
 TRAFFIC_CARRY = timedelta(minutes=15)
 
+#: How far *after* a window closed a traffic reading may still describe it.
+#:
+#: Air and weather never need this. Stations and CAMS stamp a reading with the
+#: moment it was taken and publish it later, so by the time it is fetched it
+#: already sits inside windows built around it and carries forward from there.
+#:
+#: A probe feed has no such timestamp. TomTom answers about the road *now*, so
+#: `ingest.tomtom` stamps the moment of asking — which is always a little after
+#: the newest curated window closed, because the load that built those windows
+#: ran first. Measured on the first hosted run: the newest window ended at
+#: 03:50:00, the readings landed at 03:51:16, and all sixty matched nothing. The
+#: run reported "0 curated windows now report measured traffic" having written
+#: every one of them, and would have kept doing so every hour.
+#:
+#: One window width, no more. A speed read seventy-six seconds after a window
+#: closed fairly describes that window; one read ten minutes later describes
+#: different traffic.
+TRAFFIC_GRACE = timedelta(minutes=5)
+
 
 def overlay(
     connection: psycopg.Connection,
@@ -279,6 +298,7 @@ def overlay_traffic(
     *,
     since: datetime | None = None,
     carry: timedelta = TRAFFIC_CARRY,
+    grace: timedelta = TRAFFIC_GRACE,
 ) -> dict[str, int]:
     """The same rewrite for traffic, which replaces the metric rather than the number.
 
@@ -338,7 +358,11 @@ def overlay_traffic(
                          avg(r.average_speed_kph) AS average_speed_kph
                     FROM real_traffic r
                    WHERE r.zone_id = zm.zone_id
-                     AND r.event_time <  zm.window_end
+                     -- Forward by `carry`, and back by `grace` so a reading
+                     -- taken just after a window closed can still describe it.
+                     -- See TRAFFIC_GRACE: without it every reading landed after
+                     -- the newest window and nothing was ever overlaid.
+                     AND r.event_time <  zm.window_end + %(grace)s::interval
                      AND r.event_time >= zm.window_end - %(carry)s::interval
                    GROUP BY r.tier, r.provenance, r.event_time
                    ORDER BY r.tier, r.event_time DESC
@@ -354,7 +378,7 @@ def overlay_traffic(
                  OR zm.occupancy_ratio IS NOT NULL
                  OR zm.vehicle_count   IS NOT NULL)
             """,
-            {"floor": floor, "since": since, "carry": carry},
+            {"floor": floor, "since": since, "carry": carry, "grace": grace},
         )
         targets = cursor.fetchall()
 
